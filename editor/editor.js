@@ -46,7 +46,11 @@ function fromPublished() {
   };
 }
 const PLACES = new Set(['lagoon', 'pool51', 'pool10', 'pool14', 'office']);
-function emptyInfo() { return Object.fromEntries(LANGS.map(l => [l, { title: '', text: '' }])); }
+function emptyInfo() { return { title: '', text: '', link: '' }; }
+function normInfo(x) { // старый формат по языкам → одно поле
+  if (!x) return emptyInfo(); if (typeof x.text === 'string') return { title: x.title || '', text: x.text, link: x.link || '' };
+  for (const l of ['es', 'ru', 'en', 'fr']) if (x[l] && (x[l].text || '').trim()) return { title: x[l].title || '', text: x[l].text, link: '' };
+  return emptyInfo(); }
 function normStart(s) { return { kind: PLACES.has(s.id) ? 'place' : 'entrance', info: '', link: '', ...s, name: { ...s.name } }; }
 function fromFile(f) {
   if (!f || f.format !== 'flamenca-edits' || !f.graph) throw new Error('Это не файл правок навигатора (нет format: "flamenca-edits").');
@@ -58,7 +62,7 @@ function fromFile(f) {
   d.lifts = (f.lifts || []).map(l => ({ ...l }));
   d.water = (f.water || []).map(w => ({ info: '', link: '', ...w }));
   d.points = (f.points || []).map(p => ({ ...p }));
-  d.info = Object.assign(emptyInfo(), clone(f.info || {}));
+  d.info = normInfo(f.info);
   d.georef = ((f.georef && f.georef.points) || []).map(p => ({ ...p }));
   return d;
 }
@@ -363,15 +367,16 @@ function showTab(t) { tab = t; document.querySelectorAll('.tabs button').forEach
   if (t === 'objs') renderObjs(); if (t === 'page') renderPage(); if (t === 'geo') renderGeo(); }
 const LN = { es: 'Español', en: 'English', fr: 'Français', ru: 'Русский' };
 function renderPage() {
-  const p = $('p-page');
-  p.innerHTML = `<div class="note">Вкладка «Информация» в простом режиме навигатора. Пустой язык показывает текст на испанском, затем на английском.</div>
-    <div class="note">Разметка: <code># Заголовок</code>, <code>## Подзаголовок</code>, <code>- пункт списка</code>, <code>**жирный**</code>, <code>[текст](https://ссылка)</code>; адреса https://… становятся ссылками; пустая строка — новый абзац.</div>` +
-    LANGS.map(l => `<details${l === 'es' ? ' open' : ''}><summary class="lbl" style="cursor:pointer;padding:4px 0">${LN[l] || l} ${D.info[l] && D.info[l].text ? '✓' : ''}</summary>
-      ${field('Заголовок вкладки', `<input data-pl="${l}" data-pf="title" value="${esc(D.info[l] && D.info[l].title)}" placeholder="${l === 'ru' ? 'Информация' : 'Información'}">`)}
-      ${field('Текст', `<textarea data-pl="${l}" data-pf="text" style="min-height:220px">${esc(D.info[l] && D.info[l].text)}</textarea>`)}</details>`).join('');
+  const p = $('p-page'), o = D.info;
+  p.innerHTML = `<div class="lbl">Страница общей информации</div>
+    <div class="note">Открывается кнопкой «Información» в шапке навигатора (в обоих режимах). Пока текст пустой, кнопки нет.</div>
+    ${field('Заголовок (необязательно)', `<input data-ik="title" value="${esc(o.title)}" placeholder="Flamenca Village">`)}
+    ${field('Текст', `<textarea data-ik="text" style="min-height:260px" placeholder="Контакты администрации, правила бассейна, часы работы…">${esc(o.text)}</textarea>`)}
+    ${field('Ссылка (необязательно)', `<input data-ik="link" value="${esc(o.link)}" placeholder="https://…">`)}
+    <div class="note">Разметка как в поле «Информация» у объектов: адреса https://… становятся ссылками, <code>**жирный**</code>; дополнительно <code># Заголовок</code>, <code>- пункт списка</code>, <code>[текст](https://ссылка)</code>, пустая строка — новый абзац.</div>`;
   let snapped = false;
-  p.querySelectorAll('[data-pl]').forEach(i => i.addEventListener('input', () => { if (!snapped) { snap(); snapped = true; }
-    const l = i.dataset.pl; D.info[l] = D.info[l] || { title: '', text: '' }; D.info[l][i.dataset.pf] = i.value; dirty = true;
+  p.querySelectorAll('[data-ik]').forEach(i => i.addEventListener('input', () => { if (!snapped) { snap(); snapped = true; }
+    D.info[i.dataset.ik] = i.value; dirty = true;
     clearTimeout(saveT); saveT = setTimeout(() => store.set(DRAFT, JSON.stringify({ t: Date.now(), d: toFile() })), 500); }));
 }
 function renderGeo() {

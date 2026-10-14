@@ -17,10 +17,7 @@
   <header class="top">
     <h1 id="apptitle">FlamencaDemoPlan</h1>
     <div class="ctrls">
-      <div class="seg" id="modeseg" role="group" aria-label="Interface">
-        <button type="button" data-v="simple">Simple</button>
-        <button type="button" data-v="pro">Pro</button>
-      </div>
+      <button class="btn infobtn" id="infobtn" type="button" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>Información</span></button>
       <select id="lang" aria-label="Language">
         <option value="es">ES · Español</option>
         <option value="en">EN · English</option>
@@ -32,8 +29,6 @@
 
   <div class="grid">
     <aside>
-      <div class="seg full simple-only" id="stabs" role="tablist" hidden><button type="button" data-v="route" class="on">Ruta</button><button type="button" data-v="info">Información</button></div>
-      <article id="infopage" class="infopage simple-only info-only"></article>
       <!-- Simple: номер квартиры крупно -->
       <form id="sform" class="simple-only route-only" novalidate>
         <label class="lbl" for="num" data-i="aptNumber">Número de apartamento</label>
@@ -96,10 +91,6 @@
           <g id="g-me"></g>
         </g>
       </svg>
-      <div class="layers pro-only" id="layers">
-        <button type="button" id="layerbtn" aria-expanded="true" aria-controls="layerbody"><span data-i="layers">Capas</span> <span aria-hidden="true" id="layerarrow">▾</span></button>
-        <div class="body" id="layerbody"></div>
-      </div>
       <div class="mapctl">
         <button id="zin" type="button">+</button>
         <button id="zout" type="button">−</button>

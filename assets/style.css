@@ -147,3 +147,8 @@ svg .mk{transform:scale(var(--ms,1))}
 .plink{align-self:flex-start;text-decoration:none;margin-top:4px}
 .ntoast{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:9px;font-size:13px;z-index:60;max-width:calc(100% - 32px)}
 #locate.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.infobtn{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.pop.big .popc{width:min(680px,100%);max-height:88vh}
+.legend2{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend2 i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:6px;vertical-align:middle}

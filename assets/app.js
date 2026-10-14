@@ -277,7 +277,7 @@ for (const it of OBJS) { const g = el('g', { transform: `translate(${it.o.x} ${i
 const MODES = ['simple', 'pro'];
 const state = {
   locked: MODES.includes(params.get('mode')) && params.has('lock'), geo: null,
-  mode: MODES.includes(params.get('mode')) ? params.get('mode') : (MODES.includes(store.get('mode')) ? store.get('mode') : 'simple'),
+  mode: MODES.includes(params.get('mode')) ? params.get('mode') : 'simple',
   apt: null, from: Z.starts[0].id, customStart: null, picking: false, floor: 'all', show: 'all', hover: -1
 };
 const simple = () => state.mode === 'simple';
@@ -314,53 +314,69 @@ const startPoint = () => (state.from === '__custom' || state.from === '__geo') ?
 const startName = () => state.from === '__geo' ? T('myLocation') : state.from === '__custom' ? T('pointOnMap') : tr(Z.starts.find(s => s.id === state.from).name);
 let lastPts = null;
 
+const liftNodeCache = new Map();
+function drawRoute(gR, sp, tx, ty, tnode, color) {
+  const r = dijkstra(sp.node, tnode);
+  let pts = [[sp.x, sp.y], ...r.path.map(i => NODES[i]), [tx, ty]];
+  if (r.gapFrom >= 0) { const tail = pts.slice(r.gapFrom + 1); pts = pts.slice(0, r.gapFrom + 2);
+    el('polyline', { points: tail.map(q => q.join(',')).join(' '), fill: 'none', stroke: color, 'stroke-width': 4, 'stroke-dasharray': '8 8', 'stroke-linecap': 'round' }, gR); }
+  const len = r.len + Math.hypot(sp.x - NODES[sp.node][0], sp.y - NODES[sp.node][1]) + Math.hypot(tx - NODES[tnode][0], ty - NODES[tnode][1]);
+  const ps = pts.map(q => q.join(',')).join(' ');
+  el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-width': 13, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
+  el('polyline', { points: ps, fill: 'none', stroke: color, 'stroke-width': 7, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
+  el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-opacity': .55, 'stroke-width': 2.5, 'stroke-linecap': 'round', class: 'routeline' }, gR);
+  return { pts, len };
+}
+/** крупная метка «↑3 E» / «↑3 L» над лестницей или лифтом */
+function floorBadge(g, x, y, floor, letter, color, dx = 0) {
+  const o = el('g', { transform: `translate(${x} ${y})` }, g), k = el('g', { class: 'mk' }, o);
+  const t = el('g', { transform: `translate(${dx} -34)` }, k);
+  el('path', { d: 'M-6 14L0 26 6 14Z', fill: color }, t);
+  el('rect', { x: -27, y: -20, width: 54, height: 36, rx: 9, fill: color, stroke: '#fff', 'stroke-width': 3 }, t);
+  el('text', { x: -4, y: 9, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, t).textContent = floor > 0 ? '↑' + floor : String(floor);
+  el('text', { x: 18, y: 12, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, t).textContent = letter;
+}
+const C_STAIR = '#2f7a4d', C_LIFT = '#1f4fd1';
 function render() {
   renderStacks(); const gR = $('g-route'); gR.innerHTML = '';
   const info = $('info');
   if (!state.apt) { info.innerHTML = `<div class="note">${esc(simple() ? T('simpleEmpty') : T('proEmpty'))}</div>`; lastPts = null; return; }
-  const a = state.apt, s = STACKS[a.stack], st = stairOf(a), sp = startPoint();
-  const r = dijkstra(sp.node, st.node);
-  let pts = [[sp.x, sp.y], ...r.path.map(i => NODES[i]), [st.x, st.y]];
-  if (r.gapFrom >= 0) { const tail = pts.slice(r.gapFrom + 1); pts = pts.slice(0, r.gapFrom + 2);
-    el('polyline', { points: tail.map(q => q.join(',')).join(' '), fill: 'none', stroke: '#1f4fd1', 'stroke-width': 4, 'stroke-dasharray': '8 8', 'stroke-linecap': 'round' }, gR); }
-  const len = r.len + Math.hypot(sp.x - NODES[sp.node][0], sp.y - NODES[sp.node][1]) + Math.hypot(st.x - NODES[st.node][0], st.y - NODES[st.node][1]);
-  const ps = pts.map(q => q.join(',')).join(' ');
-  el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-width': 13, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
-  el('polyline', { points: ps, fill: 'none', stroke: '#1f4fd1', 'stroke-width': 7, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
-  el('polyline', { points: ps, fill: 'none', stroke: '#9fb6ff', 'stroke-width': 3, 'stroke-linecap': 'round', class: 'routeline' }, gR);
-  el('circle', { cx: pts[0][0], cy: pts[0][1], r: 11, fill: '#1d2420', stroke: '#fff', 'stroke-width': 3 }, gR);
+  const a = state.apt, s = STACKS[a.stack], st = stairOf(a), sp = startPoint(), n = st.n;
+  const lf = liftOf(a), up = a.floor > 0;
+  // лифт: из данных редактора, иначе — условно у лестницы
+  const lx = lf ? lf.x : st.x, ly = lf ? lf.y : st.y;
+  const sameSpot = Math.hypot(lx - st.x, ly - st.y) * M_PER_PX < 3;
+  let lnode = st.node; if (!sameSpot) { const key = lx + ',' + ly; if (!liftNodeCache.has(key)) liftNodeCache.set(key, nearestNode(lx, ly)); lnode = liftNodeCache.get(key); }
+  const rs = drawRoute(gR, sp, st.x, st.y, st.node, up && sameSpot ? C_LIFT : C_STAIR);
+  const rl = up && !sameSpot ? drawRoute(gR, sp, lx, ly, lnode, C_LIFT) : rs;
+  el('circle', { cx: sp.x, cy: sp.y, r: 11, fill: '#1d2420', stroke: '#fff', 'stroke-width': 3 }, gR);
   el('line', { x1: st.x, y1: st.y, x2: s.c[0], y2: s.c[1], stroke: '#d1491f', 'stroke-width': 3.5, 'stroke-dasharray': '5 5' }, gR);
+  if (!sameSpot && up) el('line', { x1: lx, y1: ly, x2: s.c[0], y2: s.c[1], stroke: '#d1491f', 'stroke-width': 3.5, 'stroke-dasharray': '5 5' }, gR);
+  if (up && sameSpot) { floorBadge(gR, st.x, st.y, a.floor, 'E', C_STAIR, -30); floorBadge(gR, st.x, st.y, a.floor, 'L', C_LIFT, 30); }
+  else { floorBadge(gR, st.x, st.y, a.floor, 'E', C_STAIR); if (up) floorBadge(gR, lx, ly, a.floor, 'L', C_LIFT); }
   const boxes = (simple() ? s.near : [a.stack]).map(i => STACKS[i].box);
-  lastPts = pts.concat(...boxes.map(b => [[b[0], b[1]], [b[2], b[3]]]));
-  const meters = Math.round(len * M_PER_PX), mins = Math.max(1, Math.round(meters / WALK / 60)), n = st.n;
-  const lf = liftOf(a), wp = simple() ? null : waterOf(a), ep = simple() ? null : elecOf(a);
-  const liftBig = a.floor === 0 ? '—' : (lf ? lf.id.replace(/^L-?/, '') : n);
-  const liftSmall = a.floor === 0 ? T('noLift') : (lf ? (lf.note || lf.id) : T('liftNear')(n));
+  lastPts = rs.pts.concat(rl.pts, ...boxes.map(b => [[b[0], b[1]], [b[2], b[3]]]));
+  const mS = Math.round(rs.len * M_PER_PX), mL = Math.round(rl.len * M_PER_PX), meters = Math.min(mS, mL);
+  const mins = Math.max(1, Math.round(meters / WALK / 60));
+  const wp = simple() ? null : waterOf(a), ep = simple() ? null : elecOf(a);
+  const liftBig = !up ? '—' : (lf ? lf.id.replace(/^L-?/, '') : n);
   const liftStar = lf ? '' : '*';
-  const waterHtml = wp ? `<p class="note">${esc(T('water'))}: <b>${esc(wp.id)}</b>${wp.place ? ' · ' + esc(wp.place) : ''}${wp.floor !== undefined && wp.floor !== null ? ' · ' + esc(T('floorN')(+wp.floor)) : ''}</p>` : '';
+  const liftSmall = !up ? T('noLift') : `≈${mL} ${T('m')}` + (lf && lf.note ? ' · ' + lf.note : (lf ? '' : ' · ' + T('liftNear')(n)));
   const head = a.kind === 'apt'
     ? `<div class="ansnum mono">${a.num}</div><div class="anssub">${esc(T('bld')(s.block))} · <span class="mono">${a.code}</span></div>`
     : `<div class="ansnum mono">${esc(label(a))}</div><div class="anssub">${esc(T('local'))} · ${esc(T('bld')(s.block))}</div>`;
-  if (simple()) {
-    info.innerHTML = `
-      <div class="ans">${head}</div>
-      <div class="tiles">
-        <div class="tile t-esc e${n > 1 ? 2 : 1}"><span>${esc(T('staircase'))}</span><b>${n}</b><small>Escalera ${n} · ${esc(T('bld')(st.group))}</small></div>
-        <div class="tile t-lift"><span>${esc(T('lift'))}${liftStar}</span><b>${esc(liftBig)}</b><small>${esc(liftSmall)}</small></div>
-        <div class="tile"><span>${esc(T('floor'))}</span><b>${a.floor}</b><small>${esc(a.floor === 0 ? T('groundFloor') : T('floorN')(a.floor))}</small></div>
-        <div class="tile"><span>${esc(T('walk'))}</span><b>≈${meters}<i> ${T('m')}</i></b><small>${esc(T('minutes')(mins))}</small></div>
-      </div>
-      ${waterHtml}${lf ? '' : `<p class="note">${esc(T('liftNote'))}</p>`}`;
-    return;
-  }
-  const steps = [T('start')(startName()), T('alongPaths')(meters), T('entrance')(st.group, n), a.floor === 0 ? T('levelEntry') : T('goUp')(a.floor), T('door')(a.code)];
-  info.innerHTML = `<div class="dest">${esc(a.kind === 'apt' ? a.num + ' · ' + a.code : a.code)}</div>
-    <div class="stat"><div><b>≈${meters} ${T('m')}</b><span>${esc(T('walk'))}</span></div><div><b>${esc(T('minutes')(mins))}</b><span>${esc(T('onSite'))}</span></div><div><b>${a.floor}</b><span>${esc(T('floor'))}</span></div></div>
-    <dl class="kv"><dt>${esc(T('block'))}</dt><dd>${esc(s.block)}</dd><dt>${esc(T('staircase'))}</dt><dd>Escalera ${n}</dd><dt>${esc(T('lift'))}</dt><dd>${esc(lf && a.floor ? lf.id : liftSmall)}${liftStar}</dd>${wp ? `<dt>${esc(T('water'))}</dt><dd>${esc(wp.id)}${wp.place ? ' · ' + esc(wp.place) : ''}</dd>` : ''}${ep ? `<dt>${esc(T('type').elec)}</dt><dd>${esc(ep.id)}${ep.place ? ' · ' + esc(ep.place) : ''}</dd>` : ''}</dl>
-    <ol class="steps">${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
-    ${lf ? '' : `<p class="note">${esc(T('liftNote'))}</p>`}
-    <button class="btn" id="fitroute" type="button">${esc(T('showRoute'))}</button>`;
-  $('fitroute').onclick = () => fitTo(lastPts);
+  const tiles = `<div class="tiles">
+      <div class="tile t-esc e${n > 1 ? 2 : 1}"><span>${esc(T('staircase'))}</span><b>${n}</b><small>Escalera ${n} · ≈${mS} ${T('m')}</small></div>
+      <div class="tile t-lift"><span>${esc(T('lift'))}${liftStar}</span><b>${esc(liftBig)}</b><small>${esc(liftSmall)}</small></div>
+      <div class="tile"><span>${esc(T('floor'))}</span><b>${a.floor}</b><small>${esc(a.floor === 0 ? T('groundFloor') : T('floorN')(a.floor))}</small></div>
+      <div class="tile"><span>${esc(T('walk'))}</span><b>≈${meters}<i> ${T('m')}</i></b><small>${esc(T('minutes')(mins))} · ${esc(startName())}</small></div>
+    </div>`;
+  const panels = (wp || ep) ? `<dl class="kv">${wp ? `<dt>${esc(T('water'))}</dt><dd>${esc(wp.id)}${wp.place ? ' · ' + esc(wp.place) : ''}</dd>` : ''}${ep ? `<dt>${esc(T('type').elec)}</dt><dd>${esc(ep.id)}${ep.place ? ' · ' + esc(ep.place) : ''}</dd>` : ''}</dl>` : '';
+  info.innerHTML = `<div class="ans">${head}</div>${tiles}${panels}
+    <div class="legend2"><span><i style="background:${C_STAIR}"></i>${esc(T('staircase'))}</span>${up ? `<span><i style="background:${C_LIFT}"></i>${esc(T('lift'))}</span>` : ''}</div>
+    ${lf || !up ? '' : `<p class="note">${esc(T('liftNote'))}</p>`}
+    ${simple() ? '' : `<button class="btn" id="fitroute" type="button">${esc(T('showRoute'))}</button>`}`;
+  if ($('fitroute')) $('fitroute').onclick = () => fitTo(lastPts);
 }
 
 function selectApt(a, fit = true) {
@@ -411,9 +427,9 @@ function buildSegs() {
   syncFloor = seg('floorseg', [['all', T('allFloors')], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3']], 'floor', renderStacks);
   seg('showseg', [['all', T('all')], ['bld', T('block')], ['apt', T('apt')]], 'show', renderStacks);
 }
-const syncMode = seg('modeseg', [['simple', 'Simple'], ['pro', 'Pro']], 'mode', () => setMode(state.mode));
+const syncMode = () => {};
 function setMode(m) {
-  state.mode = m; if (!state.locked) store.set('mode', m); syncMode();
+  state.mode = m;
   document.body.classList.toggle('mode-simple', m === 'simple'); document.body.classList.toggle('mode-pro', m === 'pro');
   if (state.picking) $('pick').click();
   applyLayers(); render();
@@ -430,7 +446,7 @@ function setLang(l) {
   $('footnote').textContent = T('foot');
   poiTitles.forEach(([e, c]) => { e.textContent = `${c} — ${tr(Z.legend[c] || '')}`; });
   badgeTitles.forEach(([e, t]) => { e.textContent = T('bld')(t); });
-  renderInfoPage(); $('stabs').querySelectorAll('button').forEach(b => { b.textContent = T(b.dataset.v === 'info' ? 'tabInfo' : 'tabRoute'); });
+  renderInfoPage();
   $('locate').setAttribute('aria-label', T('locate')); $('locate').title = T('locate'); $('useloc').textContent = '◎ ' + T('locate');
   STAIRS.forEach(s => { escEls[s.id][1].textContent = `Escalera ${s.n} · ${T('bld')(s.group)}`; liftEls[s.id][1].textContent = `${T('lift')} ${s.n}* · ${T('bld')(s.group)}`; });
   stackEls.forEach((e, i) => { e.innerHTML = ''; el('title', {}, e).textContent = `${T('bld')(STACKS[i].block)}: ${UNITS.filter(u => u.stack === i).map(label).join(', ')}`; });
@@ -465,10 +481,10 @@ const PRESETS = [
   ['apts', 'esc', 'raster', 'graph']];
 const SIMPLE_LAYERS = new Set(['places', 'liftsdata', 'apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
 PRESETS[0].push('liftsdata', 'places', 'panels'); PRESETS[1].push('liftsdata', 'places'); PRESETS[2].push('places');
-const on = new Set(PRESETS[0]);
+const on = new Set(PRESETS[0]); on.add('panels');
 const boxes = {};
 function buildLayers() {
-  const body = $('layerbody'); body.innerHTML = '';
+  const body = $('layerbody'); if (!body) { applyLayers(); return; } body.innerHTML = '';
   const pr = document.createElement('div'); pr.className = 'presets';
   T('presets').forEach((n, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = n;
     b.onclick = () => { on.clear(); PRESETS[i].forEach(k => on.add(k)); applyLayers(); }; pr.appendChild(b); });
@@ -492,8 +508,8 @@ function applyLayers() {
   svg.classList.toggle('plain', !act.has('plain'));
   for (const k in boxes) boxes[k].checked = on.has(k);
 }
-$('layerbtn').onclick = () => { const b = $('layerbody'); b.hidden = !b.hidden; $('layerbtn').setAttribute('aria-expanded', String(!b.hidden)); $('layerarrow').textContent = b.hidden ? '▸' : '▾'; };
-if (isPhone()) $('layerbtn').click();
+if ($('layerbtn')) $('layerbtn').onclick = () => { const b = $('layerbody'); b.hidden = !b.hidden; $('layerbtn').setAttribute('aria-expanded', String(!b.hidden)); $('layerarrow').textContent = b.hidden ? '▸' : '▾'; };
+if (isPhone() && $('layerbtn')) $('layerbtn').click();
 
 /* ================= зум, панорама, клики ================= */
 let vb = [...FULL];
@@ -577,12 +593,12 @@ function openPop(it) {
   $('popb').innerHTML = `<div class="pkind pk-${it.kind}">${esc(sub)}</div><h3 id="poptitle">${esc(title)}</h3>${text}${extra}${link ? `<a class="btn primary plink" href="${esc(link)}" target="_blank" rel="noopener">${esc(T('openLink'))} ↗</a>` : ''}`;
   $('pop').hidden = false; $('popx').focus();
 }
-const closePop = () => { $('pop').hidden = true; };
+const closePop = () => { $('pop').hidden = true; $('pop').classList.remove('big'); };
 $('popx').onclick = closePop;
 $('pop').addEventListener('click', e => { if (e.target === $('pop')) closePop(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('pop').hidden) closePop(); });
 
-/* ================= вкладка «Информация» (Simple) ================= */
+/* ================= страница общей информации ================= */
 function md(src) {
   const out = []; let list = false, para = [];
   const flush = () => { if (para.length) { out.push(`<p>${para.map(linkify).join('<br>')}</p>`); para = []; } if (list) { out.push('</ul>'); list = false; } };
@@ -598,16 +614,18 @@ function md(src) {
   flush(); return out.join('');
 }
 const INFO = Z.info || {};
-const infoOf = () => { for (const l of [LANG, 'es', 'en', ...LANGS]) { const x = INFO[l]; if (x && (x.text || '').trim()) return x; } return null; };
-function renderInfoPage() {
-  const x = infoOf(); $('stabs').hidden = !x;
-  if (!x && state.tab === 'info') setTab('route');
-  $('infopage').innerHTML = x ? (x.title ? `<h2>${esc(x.title)}</h2>` : '') + md(x.text) : `<p class="note">${esc(T('infoEmpty'))}</p>`;
-  const b = $('stabs').querySelector('[data-v="info"]'); if (b && x && x.title) b.textContent = x.title;
+function infoPage() { // новый формат {text, link}; старый — по языкам {es:{title,text},…}
+  if (typeof INFO.text === 'string' && INFO.text.trim()) return { text: INFO.text, link: INFO.link, title: INFO.title };
+  for (const l of [LANG, 'es', 'en', ...LANGS]) { const x = INFO[l]; if (x && (x.text || '').trim()) return x; }
+  return null;
 }
-function setTab(t) { state.tab = t; document.body.classList.toggle('tab-info', t === 'info'); $('stabs').querySelectorAll('button').forEach(b => { const on = b.dataset.v === t; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); }
-$('stabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
-state.tab = 'route';
+function renderInfoPage() { const x = infoPage(); $('infobtn').hidden = !x; $('infobtn').querySelector('span').textContent = T('tabInfo'); }
+function openInfo() {
+  const x = infoPage(); if (!x) return; const link = safeUrl(x.link);
+  $('popb').innerHTML = `<div class="pkind">${esc(T('tabInfo'))}</div>${x.title ? `<h3 id="poptitle">${esc(x.title)}</h3>` : ''}<div class="infopage">${md(x.text)}</div>${link ? `<a class="btn primary plink" href="${esc(link)}" target="_blank" rel="noopener">${esc(T('openLink'))} ↗</a>` : ''}`;
+  $('pop').classList.add('big'); $('pop').hidden = false; $('popx').focus();
+}
+$('infobtn').onclick = openInfo;
 
 /* ================= «Где я» ================= */
 let watchId = null, firstFix = true;
@@ -638,7 +656,8 @@ function locate() {
 function useGeo() { state.from = '__geo'; state.customStart = state.geo.px; fillFrom(); render(); }
 if (GEO) { $('locate').hidden = false; $('useloc').hidden = false; }
 $('locate').onclick = locate; $('useloc').onclick = locate;
-if (state.locked) $('modeseg').hidden = true;
+if (GEO && navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(p => { if (p.state === 'granted') locate(); }).catch(() => {});
+
 
 /* ================= старт ================= */
 setLang(LANG);
