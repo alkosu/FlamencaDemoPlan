@@ -1,11 +1,31 @@
 /* FlamencaDemoPlan — навигатор по Flamenca Village.
  * Два интерфейса: Simple (по умолчанию, для смартфона) и Pro (слои, этажи, пошаговый маршрут).
  * Языки: es, en, fr, ru. Данные — window.ZHK из data/plan-data.js (python tools/build.py). */
-(() => {
+(async () => {
 'use strict';
 const $ = id => document.getElementById(id);
 if (!window.ZHK) { $('info').textContent = 'data/plan-data.js not found — run: python tools/build.py'; return; }
 const Z = window.ZHK, CFG = Z.config, VEC = Z.vector;
+
+/* ---------- правки из редактора: data/edits.json или черновик (?preview=1) ---------- */
+const PREVIEW = new URLSearchParams(location.search).has('preview');
+let EDITS = null;
+if (PREVIEW) { try { EDITS = JSON.parse(localStorage.getItem('fdp.preview')); } catch (_) { /* нет доступа к хранилищу */ } }
+if (!EDITS) { try { const r = await fetch('data/edits.json', { cache: 'no-cache' }); if (r.ok) EDITS = await r.json(); } catch (_) { /* file:// или файла нет */ } }
+if (EDITS && EDITS.format === 'flamenca-edits' && EDITS.graph) {
+  Z.graph = { nodes: EDITS.graph.nodes, edges: EDITS.graph.edges };          // закрытые отрезки (graph.closed) в маршрут не идут
+  const near = (x, y) => { let b = 0, bd = Infinity; Z.graph.nodes.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; b = i; } }); return b; };
+  if (EDITS.stairs) Z.stairs.forEach(s => { const q = EDITS.stairs[s.id]; if (q) { s.x = q[0]; s.y = q[1]; } });
+  Z.stairs.forEach(s => { s.node = near(s.x, s.y); });
+  if (Array.isArray(EDITS.starts) && EDITS.starts.length) Z.starts = EDITS.starts.map(s => ({ ...s }));
+  Z.starts.forEach(s => { s.node = near(s.x, s.y); });
+  Z.lifts = EDITS.lifts || []; Z.water = EDITS.water || [];
+}
+if (PREVIEW) {
+  const b = document.createElement('div'); b.className = 'previewbar';
+  b.innerHTML = EDITS ? 'Предпросмотр данных из редактора — видно только на этом устройстве. <a href="./">Выйти</a>' : 'Предпросмотр: черновик не найден. <a href="./">Выйти</a>';
+  document.body.prepend(b);
+}
 
 /* ================= i18n ================= */
 const I18N = {

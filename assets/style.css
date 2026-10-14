@@ -121,3 +121,6 @@ header.top h1{font-size:18px;line-height:1.25;flex:1 1 220px;min-width:0}
 
 .stk.loc{fill:#f3e4f2}
 .plain .stk.loc{fill:#f3e4f2}
+
+.previewbar{background:#b5541f;color:#fff;padding:7px 12px;font-size:13px;border-radius:8px;max-width:1400px;margin:0 auto 10px}
+.previewbar a{color:#fff;font-weight:600}
