@@ -332,14 +332,16 @@ function drawRoute(gR, sp, tx, ty, tnode, color) {
   el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-opacity': .55, 'stroke-width': 2.5, 'stroke-linecap': 'round', class: 'routeline' }, gR);
   return { pts, len };
 }
-/** крупная метка «↑3 E» / «↑3 L» над лестницей или лифтом */
-function floorBadge(g, x, y, floor, letter, color, dx = 0) {
+/** крупная метка над лестницей или лифтом: иконка (лестница / стрелки вверх-вниз) и номер этажа */
+function floorBadge(g, x, y, floor, kind, color, dx = 0) {
   const o = el('g', { transform: `translate(${x} ${y})` }, g), k = el('g', { class: 'mk' }, o);
   const t = el('g', { transform: `translate(${dx * .72} ${-34 * .72}) scale(.72)` }, k);
   el('path', { d: 'M-6 14L0 26 6 14Z', fill: color }, t);
   el('rect', { x: -27, y: -20, width: 54, height: 36, rx: 9, fill: color, stroke: '#fff', 'stroke-width': 3 }, t);
-  el('text', { x: -4, y: 9, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, t).textContent = floor > 0 ? '↑' + floor : String(floor);
-  el('text', { x: 18, y: 12, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, t).textContent = letter;
+  const ic = el('g', { transform: 'translate(-12 -2)', fill: 'none', stroke: '#fff', 'stroke-width': 2.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, t);
+  if (kind === 'lift') el('path', { d: 'M-4-3L0-9 4-3M0-9V9M-4 3L0 9 4 3' }, ic);       // стрелки вверх-вниз
+  else el('path', { d: 'M-9 9H-4V3H1V-3H6V-9H9' }, ic);                                   // ступени
+  el('text', { x: 12, y: 9, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, t).textContent = String(floor);
 }
 const C_STAIR = '#2f7a4d', C_LIFT = '#1f4fd1';
 function render() {
@@ -358,8 +360,8 @@ function render() {
   el('circle', { cx: sp.x, cy: sp.y, r: 11, fill: '#1d2420', stroke: '#fff', 'stroke-width': 3 }, gR);
   el('line', { x1: st.x, y1: st.y, x2: s.c[0], y2: s.c[1], stroke: '#d1491f', 'stroke-width': 3.5, 'stroke-dasharray': '5 5' }, gR);
   if (!sameSpot && up) el('line', { x1: lx, y1: ly, x2: s.c[0], y2: s.c[1], stroke: '#d1491f', 'stroke-width': 3.5, 'stroke-dasharray': '5 5' }, gR);
-  if (up && sameSpot) { floorBadge(gR, st.x, st.y, a.floor, 'E', C_STAIR, -30); floorBadge(gR, st.x, st.y, a.floor, 'L', C_LIFT, 30); }
-  else { floorBadge(gR, st.x, st.y, a.floor, 'E', C_STAIR); if (up) floorBadge(gR, lx, ly, a.floor, 'L', C_LIFT); }
+  if (up && sameSpot) { floorBadge(gR, st.x, st.y, a.floor, 'stair', C_STAIR, -30); floorBadge(gR, st.x, st.y, a.floor, 'lift', C_LIFT, 30); }
+  else { floorBadge(gR, st.x, st.y, a.floor, 'stair', C_STAIR); if (up) floorBadge(gR, lx, ly, a.floor, 'lift', C_LIFT); }
   const boxes = (simple() ? s.near : [a.stack]).map(i => STACKS[i].box);
   lastPts = rs.pts.concat(rl.pts, ...boxes.map(b => [[b[0], b[1]], [b[2], b[3]]]));
   const mS = Math.round(rs.len * M_PER_PX), mL = Math.round(rl.len * M_PER_PX), meters = Math.min(mS, mL);
