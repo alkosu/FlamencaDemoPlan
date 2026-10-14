@@ -345,6 +345,7 @@ const C_STAIR = '#2f7a4d', C_LIFT = '#1f4fd1';
 function render() {
   renderStacks(); const gR = $('g-route'); gR.innerHTML = '';
   const info = $('info');
+  $('hit').innerHTML = state.apt ? `<b>${esc(T('bld')(STACKS[state.apt.stack].block))}</b><span>${esc(T('floorN')(state.apt.floor))}</span>` : '';
   if (!state.apt) { info.innerHTML = `<div class="note">${esc(simple() ? T('simpleEmpty') : T('proEmpty'))}</div>`; lastPts = null; return; }
   const a = state.apt, s = STACKS[a.stack], st = stairOf(a), sp = startPoint(), n = st.n;
   const lf = liftOf(a), up = a.floor > 0;
@@ -405,7 +406,7 @@ $('sform').addEventListener('submit', e => {
   const a = findApt(v);
   if (!a) { err.textContent = T('notFound')(v); err.hidden = false; return; }
   $('num').blur(); selectApt(a);
-  if (isPhone() && $('info').scrollIntoView) $('info').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  if (isPhone() && $('mapbox').scrollIntoView) $('mapbox').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
 });
 $('num').addEventListener('input', () => { $('err').hidden = true; });
 

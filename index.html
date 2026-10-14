@@ -32,7 +32,10 @@
       <!-- Simple: номер квартиры крупно -->
       <form id="sform" class="simple-only route-only" novalidate>
         <label class="lbl" for="num" data-i="aptNumber">Número de apartamento</label>
-        <input id="num" class="bignum" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="search" placeholder="449" maxlength="8">
+        <div class="numrow">
+          <input id="num" class="bignum" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="search" placeholder="449" maxlength="8">
+          <div class="hit" id="hit" aria-live="polite"></div>
+        </div>
         <div class="err" id="err" role="alert" hidden></div>
       </form>
 
@@ -63,7 +66,7 @@
         <div class="seg full" id="showseg"></div>
       </div>
 
-      <div class="card route-only" id="info" aria-live="polite"></div>
+      <div class="card route-only pro-only" id="info" aria-live="polite"></div>
     </aside>
 
     <div class="mapbox" id="mapbox">
