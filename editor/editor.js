@@ -529,6 +529,12 @@ $('save').onclick = () => {
   a.href = URL.createObjectURL(blob); a.download = 'edits.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   dirty = false; toast('Файл edits.json скачан');
 };
+$('copyJson').onclick = async () => {
+  const txt = JSON.stringify(toFile());
+  try { await navigator.clipboard.writeText(txt); }
+  catch (_) { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); }
+  dirty = false; toast('Данные скопированы — вставьте их в data/edits.json на GitHub');
+};
 $('fileIn').onchange = async e => {
   const file = e.target.files[0]; if (!file) return;
   try { const f = JSON.parse(await file.text()); snap(); D = fromFile(f); SRC = `${file.name} от ${new Date(f.updated).toLocaleString('ru')}`; sel = null; route = null; changed(); fitAll(); toast('Файл загружен'); }

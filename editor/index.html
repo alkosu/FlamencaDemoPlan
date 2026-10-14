@@ -142,10 +142,11 @@ code{font-family:var(--mono);font-size:12px;background:var(--chip);padding:1px 4
     <div class="pane" id="p-pub" hidden>
       <div class="lbl">Как опубликовать для всех</div>
       <ol class="steps">
-        <li>Нажмите <b>Скачать edits.json</b>.</li>
-        <li>Откройте <a href="https://github.com/alkosu/FlamencaDemoPlan/upload/main/data" target="_blank" rel="noopener">загрузку в папку data на GitHub</a>, перетащите файл, нажмите <b>Commit changes</b>.</li>
+        <li>Нажмите <button class="btn" id="copyJson" type="button">Скопировать данные</button></li>
+        <li>Откройте <a href="https://github.com/alkosu/FlamencaDemoPlan/edit/main/data/edits.json" target="_blank" rel="noopener">data/edits.json на GitHub</a>, выделите весь текст (Ctrl/⌘+A), вставьте (Ctrl/⌘+V), нажмите <b>Commit changes</b>.</li>
         <li>Через 1–2 минуты навигатор начнёт использовать новые данные. Сборка не нужна.</li>
       </ol>
+      <p class="note" style="margin:0">Можно и файлом: <b>Скачать edits.json</b> → <a href="https://github.com/alkosu/FlamencaDemoPlan/upload/main/data" target="_blank" rel="noopener">загрузка в папку data</a>. <b>Важно:</b> файл должен называться ровно <code>edits.json</code>. Браузер при повторном скачивании называет его «edits (2).json» — такой файл навигатор не читает; переименуйте перед загрузкой.</p>
       <div class="lbl">Проверить до публикации</div>
       <p class="note" style="margin:0"><b>Предпросмотр в навигаторе</b> открывает сайт с текущими правками только на этом устройстве. Остальные видят опубликованную версию.</p>
       <div class="lbl">Продолжить в другой раз</div>
