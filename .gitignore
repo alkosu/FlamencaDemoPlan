@@ -9,3 +9,9 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
+
+# QGIS
+*.gpkg-wal
+*.gpkg-shm
+*.qgs~
+*.qgz~

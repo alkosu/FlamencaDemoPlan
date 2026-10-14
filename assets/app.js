@@ -10,6 +10,7 @@ const Z = window.ZHK, CFG = Z.config, VEC = Z.vector;
 /* ================= i18n ================= */
 const I18N = {
   es: {
+    water: 'Cuadro de agua',
     m: 'm', aptNumber: 'Número de apartamento', to: 'Destino', from: 'Desde', onMap: 'En el plano', search: 'Buscar',
     floorOnPlan: 'Planta en el plano', showWhich: 'Apartamentos visibles', all: 'Todos', block: 'Bloque', apt: 'Apartamento',
     layers: 'Capas', pickHint: 'Toque el plano: la salida se coloca en el camino más cercano',
@@ -29,11 +30,12 @@ const I18N = {
     ly: { apts: 'Bloques de apartamentos', aptlabels: 'Números', plain: 'Colores por escalera', esc: 'Escaleras', lifts: 'Ascensores (supuestos)',
       bld: 'Edificios y terrazas', gallery: 'Galerías y núcleos', badges: 'Números de bloque', pois: 'Servicios (leyenda)',
       walk: 'Caminos peatonales', road: 'Viales', parking: 'Aparcamiento', lawn: 'Zonas verdes', pool: 'Piscinas', labels: 'Rótulos',
-      graph: 'Red de caminos', raster: 'Planos originales' },
+      graph: 'Red de caminos', water: 'Cuadros de agua', liftsdata: 'Ascensores (QGIS)', raster: 'Planos originales' },
     rasterOpacity: 'Opacidad de los planos originales',
     foot: 'Plano unificado a partir de los cuatro planos maestros; distancias aproximadas (~0,1 m por píxel). La planta se deduce del código: A3a-449 → planta 3.'
   },
   en: {
+    water: 'Water panel',
     m: 'm', aptNumber: 'Apartment number', to: 'Destination', from: 'From', onMap: 'On the map', search: 'Search',
     floorOnPlan: 'Floor on the plan', showWhich: 'Visible apartments', all: 'All', block: 'Block', apt: 'Apartment',
     layers: 'Layers', pickHint: 'Tap the plan: the start snaps to the nearest path',
@@ -53,11 +55,12 @@ const I18N = {
     ly: { apts: 'Apartment blocks', aptlabels: 'Numbers', plain: 'Colour by staircase', esc: 'Staircases', lifts: 'Lifts (assumed)',
       bld: 'Buildings and terraces', gallery: 'Galleries and cores', badges: 'Block numbers', pois: 'Facilities (legend)',
       walk: 'Footpaths', road: 'Driveways', parking: 'Parking', lawn: 'Greenery', pool: 'Pools', labels: 'Labels',
-      graph: 'Path network', raster: 'Original plans' },
+      graph: 'Path network', water: 'Water panels', liftsdata: 'Lifts (QGIS)', raster: 'Original plans' },
     rasterOpacity: 'Original plans opacity',
     foot: 'Unified plan built from the four master plans; distances are approximate (~0.1 m per pixel). The floor is taken from the code: A3a-449 → floor 3.'
   },
   fr: {
+    water: 'Tableau d’eau',
     m: 'm', aptNumber: 'Numéro d’appartement', to: 'Destination', from: 'Départ', onMap: 'Sur le plan', search: 'Rechercher',
     floorOnPlan: 'Étage sur le plan', showWhich: 'Appartements affichés', all: 'Tous', block: 'Bâtiment', apt: 'Appartement',
     layers: 'Calques', pickHint: 'Touchez le plan : le départ se place sur l’allée la plus proche',
@@ -77,11 +80,12 @@ const I18N = {
     ly: { apts: 'Blocs d’appartements', aptlabels: 'Numéros', plain: 'Couleur par escalier', esc: 'Escaliers', lifts: 'Ascenseurs (supposés)',
       bld: 'Bâtiments et terrasses', gallery: 'Coursives et cages', badges: 'Numéros de bâtiment', pois: 'Équipements (légende)',
       walk: 'Allées piétonnes', road: 'Voies', parking: 'Parking', lawn: 'Espaces verts', pool: 'Piscines', labels: 'Étiquettes',
-      graph: 'Réseau d’allées', raster: 'Plans originaux' },
+      graph: 'Réseau d’allées', water: 'Tableaux d’eau', liftsdata: 'Ascenseurs (QGIS)', raster: 'Plans originaux' },
     rasterOpacity: 'Opacité des plans originaux',
     foot: 'Plan unifié à partir des quatre plans de masse ; distances approximatives (~0,1 m par pixel). L’étage est déduit du code : A3a-449 → 3e étage.'
   },
   ru: {
+    water: 'Щит воды',
     m: 'м', aptNumber: 'Номер квартиры', to: 'Куда', from: 'Откуда', onMap: 'На плане', search: 'Искать',
     floorOnPlan: 'Этаж на плане', showWhich: 'Какие квартиры показывать', all: 'Все', block: 'Корпус', apt: 'Квартира',
     layers: 'Слои', pickHint: 'Нажмите на план — старт встанет на ближайшую дорожку',
@@ -101,7 +105,7 @@ const I18N = {
     ly: { apts: 'Блоки квартир', aptlabels: 'Номера квартир', plain: 'Окраска по лестницам', esc: 'Лестницы', lifts: 'Лифты (условно)',
       bld: 'Корпуса и террасы', gallery: 'Галереи и ядра', badges: 'Номера корпусов', pois: 'Инфраструктура (легенда)',
       walk: 'Пешеходные дорожки', road: 'Проезды', parking: 'Парковка', lawn: 'Озеленение', pool: 'Бассейны', labels: 'Подписи',
-      graph: 'Сеть маршрутов', raster: 'Исходные планы' },
+      graph: 'Сеть маршрутов', water: 'Щиты воды', liftsdata: 'Лифты (QGIS)', raster: 'Исходные планы' },
     rasterOpacity: 'Прозрачность исходных планов',
     foot: 'Сводный план собран из четырёх листов мастер-плана; расстояния приблизительные (~0,1 м на пиксель). Этаж берётся из кода: A3a-449 → 3-й этаж.'
   }
@@ -124,7 +128,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 /* ================= данные ================= */
 const [W, H] = Z.size, M_PER_PX = Z.metersPerPx, WALK = CFG.walkSpeed;
-const STACKS = Z.stacks, STAIRS = Z.stairs, UNITS = Z.units;
+const STACKS = Z.stacks, STAIRS = Z.stairs, UNITS = Z.units, LIFTS = Z.lifts || [], WATER = Z.water || [];
 const STAIR = Object.fromEntries(STAIRS.map(s => [s.id, s]));
 const NODES = Z.graph.nodes;
 const ADJ = NODES.map(() => []);
@@ -152,6 +156,10 @@ const findApt = s => { s = String(s || '').trim().toLowerCase().replace(/^#/, ''
 const unitAt = (si, f) => UNITS.find(u => u.stack === si && u.floor === f);
 const label = u => u.kind === 'apt' ? String(u.num) : u.code.split(':')[1];
 const stairOf = u => STAIR[STACKS[u.stack].stair];
+const servesList = v => String(v || '').split(/[\s,;]+/).filter(Boolean);
+const liftOf = u => { const sid = STACKS[u.stack].stair;
+  return LIFTS.find(l => servesList(l.serves).includes(String(u.num))) || LIFTS.find(l => l.stair_id === sid && !servesList(l.serves).length) || null; };
+const waterOf = u => WATER.find(w => servesList(w.serves).includes(String(u.num)) || servesList(w.serves).includes(u.code)) || null;
 
 /* ================= план (SVG) ================= */
 const NS = 'http://www.w3.org/2000/svg';
@@ -192,6 +200,14 @@ for (const s of STAIRS) {
   el('text', { x: s.x + 22, y: s.y + 4.5, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, l).textContent = 'L';
   liftEls[s.id] = [l, el('title', {}, l)];
 }
+for (const l of LIFTS) { const g = el('g', {}, L('liftsdata'));
+  el('rect', { x: l.x - 9, y: l.y - 10, width: 18, height: 20, rx: 3, fill: '#1f4fd1', stroke: '#fff', 'stroke-width': 2.5 }, g);
+  el('text', { x: l.x, y: l.y + 4.5, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, g).textContent = 'L';
+  el('title', {}, g).textContent = `${l.id}${l.note ? ' · ' + l.note : ''}`; }
+for (const w of WATER) { const g = el('g', {}, L('water'));
+  el('circle', { cx: w.x, cy: w.y, r: 10, fill: '#2e95c2', stroke: '#fff', 'stroke-width': 2.5 }, g);
+  el('text', { x: w.x, y: w.y + 4, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, g).textContent = 'W';
+  el('title', {}, g).textContent = `${w.id} · ${w.floor ?? ''} · ${w.place || ''}`; }
 const startEls = {};
 for (const s of Z.starts) { const g = el('g', {}, $('g-starts'));
   el('rect', { x: s.x - 9, y: s.y - 9, width: 18, height: 18, rx: 3, fill: '#fff', stroke: '#1d2420', 'stroke-width': 2.5 }, g); startEls[s.id] = el('title', {}, g); }
@@ -228,7 +244,7 @@ function renderStacks() {
       us.forEach((u, k) => el('text', { x: cx, y: cy - (us.length - 1) / 2 * lh + k * lh + fs * .35, 'text-anchor': 'middle', 'font-size': fs, class: 'stl' + (a && a.code === u.code ? ' sel' : '') }, g).textContent = label(u));
     }
   });
-  for (const id in escEls) { const hide = simple() && state.apt && STACKS[state.apt.stack].stair !== id; escEls[id][0].style.display = hide ? 'none' : ''; liftEls[id][0].style.display = hide ? 'none' : ''; }
+  for (const id in escEls) { const hide = simple() && state.apt && STACKS[state.apt.stack].stair !== id; escEls[id][0].style.display = hide ? 'none' : ''; liftEls[id][0].style.display = (hide || LIFTS.length) ? 'none' : ''; }
 }
 
 /* ================= маршрут и карточка ================= */
@@ -253,6 +269,11 @@ function render() {
   const boxes = (simple() ? s.near : [a.stack]).map(i => STACKS[i].box);
   lastPts = pts.concat(...boxes.map(b => [[b[0], b[1]], [b[2], b[3]]]));
   const meters = Math.round(len * M_PER_PX), mins = Math.max(1, Math.round(meters / WALK / 60)), n = st.n;
+  const lf = liftOf(a), wp = waterOf(a);
+  const liftBig = a.floor === 0 ? '—' : (lf ? lf.id.replace(/^L-?/, '') : n);
+  const liftSmall = a.floor === 0 ? T('noLift') : (lf ? (lf.note || lf.id) : T('liftNear')(n));
+  const liftStar = lf ? '' : '*';
+  const waterHtml = wp ? `<p class="note">${esc(T('water'))}: <b>${esc(wp.id)}</b>${wp.place ? ' · ' + esc(wp.place) : ''}${wp.floor !== undefined && wp.floor !== null ? ' · ' + esc(T('floorN')(+wp.floor)) : ''}</p>` : '';
   const head = a.kind === 'apt'
     ? `<div class="ansnum mono">${a.num}</div><div class="anssub">${esc(T('bld')(s.block))} · <span class="mono">${a.code}</span></div>`
     : `<div class="ansnum mono">${esc(label(a))}</div><div class="anssub">${esc(T('local'))} · ${esc(T('bld')(s.block))}</div>`;
@@ -261,19 +282,19 @@ function render() {
       <div class="ans">${head}</div>
       <div class="tiles">
         <div class="tile t-esc e${n > 1 ? 2 : 1}"><span>${esc(T('staircase'))}</span><b>${n}</b><small>Escalera ${n} · ${esc(T('bld')(st.group))}</small></div>
-        <div class="tile t-lift"><span>${esc(T('lift'))}*</span><b>${a.floor === 0 ? '—' : n}</b><small>${esc(a.floor === 0 ? T('noLift') : T('liftNear')(n))}</small></div>
+        <div class="tile t-lift"><span>${esc(T('lift'))}${liftStar}</span><b>${esc(liftBig)}</b><small>${esc(liftSmall)}</small></div>
         <div class="tile"><span>${esc(T('floor'))}</span><b>${a.floor}</b><small>${esc(a.floor === 0 ? T('groundFloor') : T('floorN')(a.floor))}</small></div>
         <div class="tile"><span>${esc(T('walk'))}</span><b>≈${meters}<i> ${T('m')}</i></b><small>${esc(T('minutes')(mins))}</small></div>
       </div>
-      <p class="note">${esc(T('liftNote'))}</p>`;
+      ${waterHtml}${lf ? '' : `<p class="note">${esc(T('liftNote'))}</p>`}`;
     return;
   }
   const steps = [T('start')(startName()), T('alongPaths')(meters), T('entrance')(st.group, n), a.floor === 0 ? T('levelEntry') : T('goUp')(a.floor), T('door')(a.code)];
   info.innerHTML = `<div class="dest">${esc(a.kind === 'apt' ? a.num + ' · ' + a.code : a.code)}</div>
     <div class="stat"><div><b>≈${meters} ${T('m')}</b><span>${esc(T('walk'))}</span></div><div><b>${esc(T('minutes')(mins))}</b><span>${esc(T('onSite'))}</span></div><div><b>${a.floor}</b><span>${esc(T('floor'))}</span></div></div>
-    <dl class="kv"><dt>${esc(T('block'))}</dt><dd>${esc(s.block)}</dd><dt>${esc(T('staircase'))}</dt><dd>Escalera ${n}</dd><dt>${esc(T('lift'))}</dt><dd>${esc(a.floor === 0 ? T('noLift') : T('liftNear')(n))}*</dd></dl>
+    <dl class="kv"><dt>${esc(T('block'))}</dt><dd>${esc(s.block)}</dd><dt>${esc(T('staircase'))}</dt><dd>Escalera ${n}</dd><dt>${esc(T('lift'))}</dt><dd>${esc(lf && a.floor ? lf.id : liftSmall)}${liftStar}</dd>${wp ? `<dt>${esc(T('water'))}</dt><dd>${esc(wp.id)}${wp.place ? ' · ' + esc(wp.place) : ''}</dd>` : ''}</dl>
     <ol class="steps">${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
-    <p class="note">${esc(T('liftNote'))}</p>
+    ${lf ? '' : `<p class="note">${esc(T('liftNote'))}</p>`}
     <button class="btn" id="fitroute" type="button">${esc(T('showRoute'))}</button>`;
   $('fitroute').onclick = () => fitTo(lastPts);
 }
@@ -369,14 +390,15 @@ q.addEventListener('blur', () => setTimeout(() => sugg.hidden = true, 150));
 $('pick').onclick = () => { state.picking = !state.picking; $('pick').classList.toggle('on', state.picking); svg.classList.toggle('picking', state.picking); $('hint').hidden = !state.picking; };
 
 /* ================= слои ================= */
-const LAYER_DEF = [['apts', 'aptlabels', 'plain', 'esc', 'lifts'], ['bld', 'gallery', 'badges'], ['pois', 'pool', 'lawn', 'walk', 'road', 'parking'], ['graph', 'raster']];
-const SW = { apts: '#eef6ef', plain: '#fbf2e2', esc: '#2f7a4d', lifts: '#1f4fd1', bld: '#e7e1d3', gallery: '#efd57c', badges: '#2b2f2c', walk: '#e9dcbd', road: '#d3d6d3', parking: '#848985', lawn: '#bcd592', pool: '#57c1ea', graph: '#1f4fd1' };
+const LAYER_DEF = [['apts', 'aptlabels', 'plain', 'esc', LIFTS.length ? 'liftsdata' : 'lifts', ...(WATER.length ? ['water'] : [])], ['bld', 'gallery', 'badges'], ['pois', 'pool', 'lawn', 'walk', 'road', 'parking'], ['graph', 'raster']];
+const SW = { water: '#2e95c2', liftsdata: '#1f4fd1', apts: '#eef6ef', plain: '#fbf2e2', esc: '#2f7a4d', lifts: '#1f4fd1', bld: '#e7e1d3', gallery: '#efd57c', badges: '#2b2f2c', walk: '#e9dcbd', road: '#d3d6d3', parking: '#848985', lawn: '#bcd592', pool: '#57c1ea', graph: '#1f4fd1' };
 const PRESETS = [
   ['apts', 'aptlabels', 'plain', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'pois', 'pool', 'lawn', 'walk', 'road', 'parking'],
   ['apts', 'aptlabels', 'esc', 'lifts', 'bld', 'badges', 'walk', 'road'],
   ['apts', 'aptlabels', 'plain', 'esc', 'badges'],
   ['apts', 'esc', 'raster', 'graph']];
-const SIMPLE_LAYERS = new Set(['apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
+const SIMPLE_LAYERS = new Set(['liftsdata', 'apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
+PRESETS[0].push('liftsdata', 'water'); PRESETS[1].push('liftsdata');
 const on = new Set(PRESETS[0]);
 const boxes = {};
 function buildLayers() {

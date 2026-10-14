@@ -4,7 +4,8 @@
 Вход:   data/complex.json        — настройки: заголовок, языки, точки старта
         data/master/model.json   — стояки (контуры, коды квартир), лестницы, объекты легенды
         data/master/vector.json  — векторные слои территории
-        data/master/graph.json   — сеть пешеходных дорожек, привязка лестниц
+        data/qgis/flamenca.gpkg  — правки из QGIS: дорожки, лестницы, точки старта, лифты, щиты воды
+                                   (если файла нет — дорожки берутся из data/master/paths.json)
 Выход:  data/plan-data.js        — всё для страницы (window.ZHK)
         export/plan_layers.svg   — сводный план со слоями (в т.ч. по этажам) для Inkscape/Figma
         export/apartments.csv    — перечень апартаментов и помещений
@@ -16,10 +17,143 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 rd = lambda p: json.loads((ROOT / p).read_text(encoding="utf-8"))
-CFG, MODEL, VEC, GRAPH = rd("data/complex.json"), rd("data/master/model.json"), rd("data/master/vector.json"), rd("data/master/graph.json")
+CFG, MODEL, VEC = rd("data/complex.json"), rd("data/master/model.json"), rd("data/master/vector.json")
 W, H = MODEL["size"]
-NODES = [list(p) for p in GRAPH["nodes"]]
-EDGES = [list(e) for e in GRAPH["edges"]]
+S = 0.1                       # метров на пиксель; в QGIS: X = px·S, Y = −py·S
+GPKG = ROOT / "data/qgis/flamenca.gpkg"
+NODES, EDGES = [], []
+
+
+# ---------- чтение GeoPackage без GDAL ----------
+def _wkb(buf, o=0):
+    import struct
+    bo = "<" if buf[o] == 1 else ">"
+    t = struct.unpack_from(bo + "I", buf, o + 1)[0]; o += 5
+    dims = 3 if (t // 1000) in (1, 2) or t & 0x80000000 else 2
+    if (t // 1000) == 3: dims = 4
+    t = (t & 0xFFFF) % 1000
+    pt = lambda o: (struct.unpack_from(bo + "dd", buf, o), o + 8 * dims)
+    if t == 1:
+        p, o = pt(o); return ("Point", p), o
+    if t == 2:
+        n = struct.unpack_from(bo + "I", buf, o)[0]; o += 4; pts = []
+        for _ in range(n):
+            p, o = pt(o); pts.append(p)
+        return ("LineString", pts), o
+    if t == 3:
+        rings = []; n = struct.unpack_from(bo + "I", buf, o)[0]; o += 4
+        for _ in range(n):
+            k = struct.unpack_from(bo + "I", buf, o)[0]; o += 4; r = []
+            for _ in range(k):
+                p, o = pt(o); r.append(p)
+            rings.append(r)
+        return ("Polygon", rings), o
+    if t in (4, 5, 6):
+        n = struct.unpack_from(bo + "I", buf, o)[0]; o += 4; parts = []
+        for _ in range(n):
+            g, o = _wkb(buf, o); parts.append(g)
+        return ("Multi", parts), o
+    raise ValueError(f"WKB type {t}")
+
+
+def read_gpkg(layer):
+    """Строки слоя: список (геометрия, dict атрибутов). Пустой список, если слоя нет."""
+    import sqlite3
+    if not GPKG.exists(): return []
+    con = sqlite3.connect(GPKG)
+    try:
+        r = con.execute("select column_name from gpkg_geometry_columns where table_name=?", (layer,)).fetchone()
+        if not r: return []
+        gcol = r[0]; cur = con.execute(f'select * from "{layer}"'); cols = [c[0] for c in cur.description]; out = []
+        for row in cur:
+            rec = dict(zip(cols, row)); blob = rec.pop(gcol)
+            if not blob: continue
+            flags = blob[3]; env = {0: 0, 1: 32, 2: 48, 3: 48, 4: 64}[(flags >> 1) & 7]
+            geom, _ = _wkb(blob, 8 + env); out.append((geom, rec))
+        return out
+    finally:
+        con.close()
+
+
+to_px = lambda p: (p[0] / S, -p[1] / S)
+
+
+def lines_of(g):
+    if g[0] == "LineString": return [g[1]]
+    if g[0] == "Multi": return [x for part in g[1] for x in lines_of(part)]
+    return []
+
+
+def load_paths():
+    """Полилинии дорожек в пикселях плана: из QGIS, иначе из автосети."""
+    rows = read_gpkg("paths")
+    if rows:
+        out = []
+        for g, a in rows:
+            if str(a.get("access") or "").lower() == "closed": continue
+            out += [[to_px(p) for p in l] for l in lines_of(g)]
+        return out, "QGIS"
+    return rd("data/master/paths.json"), "автосеть"
+
+
+def graph_from_lines(lines, snap=3.0, tsnap=20.0):
+    """Узлы — вершины (совпадающие в пределах snap px сливаются), рёбра — сегменты.
+    Висячие концы ближе tsnap px к чужому сегменту врезаются в него (T-образные примыкания)."""
+    grid = {}
+    def node(p):
+        gx, gy = int(p[0] // snap), int(p[1] // snap)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for i in grid.get((gx + dx, gy + dy), []):
+                    if math.dist(NODES[i], p) <= snap: return i
+        NODES.append([round(p[0], 1), round(p[1], 1)]); grid.setdefault((gx, gy), []).append(len(NODES) - 1); return len(NODES) - 1
+    es = set()
+    for l in lines:
+        ids = [node(p) for p in l]
+        for a, b in zip(ids, ids[1:]):
+            if a != b: es.add((min(a, b), max(a, b)))
+    deg = {}
+    for a, b in es: deg[a] = deg.get(a, 0) + 1; deg[b] = deg.get(b, 0) + 1
+    for n in [n for n, d in deg.items() if d == 1]:
+        px, py = NODES[n]; best = None
+        for a, b in es:
+            if n in (a, b): continue
+            (ax, ay), (bx, by) = NODES[a], NODES[b]; dx, dy = bx - ax, by - ay; L2 = dx * dx + dy * dy
+            if not L2: continue
+            t = max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / L2)); qx, qy = ax + t * dx, ay + t * dy; d = math.hypot(px - qx, py - qy)
+            if d <= tsnap and (best is None or d < best[0]): best = (d, a, b, t, qx, qy)
+        if best:
+            d, a, b, t, qx, qy = best
+            if t <= 0.01: es.add((min(n, a), max(n, a)))
+            elif t >= 0.99: es.add((min(n, b), max(n, b)))
+            else:
+                NODES.append([round(qx, 1), round(qy, 1)]); m = len(NODES) - 1
+                es.discard((a, b)); es |= {(min(a, m), max(a, m)), (min(m, b), max(m, b)), (min(n, m), max(n, m))}
+    # оторванные куски: пришить к основной сети, если зазор < bridge px
+    bridge = 80.0; added = 0
+    while True:
+        adj = {}
+        for a, b in es: adj.setdefault(a, []).append(b); adj.setdefault(b, []).append(a)
+        comp = {}
+        for s0 in adj:
+            if s0 in comp: continue
+            comp[s0] = s0; st = [s0]
+            while st:
+                u = st.pop()
+                for v in adj[u]:
+                    if v not in comp: comp[v] = s0; st.append(v)
+        groups = {}
+        for n, c in comp.items(): groups.setdefault(c, []).append(n)
+        if len(groups) == 1: break
+        done = False
+        for g in sorted(groups.values(), key=len)[:-1]:   # от мелких кусков к крупным
+            gs = set(g); others = [n for n in comp if n not in gs]
+            best = min(((math.dist(NODES[a], NODES[b]), a, b) for a in g for b in others), default=None)
+            if best and best[0] < bridge:
+                es.add((min(best[1], best[2]), max(best[1], best[2]))); added += 1; done = True; break
+        if not done: break
+    if added: print(f"Пришито оторванных участков: {added} (зазор < {bridge * S:.0f} м)")
+    EDGES.extend([list(e) for e in sorted(es)])
 
 
 def nearest_node(x, y):
@@ -42,9 +176,16 @@ def add_extra_paths():
 
 
 def build():
-    add_extra_paths()
-    stair_node = {s["id"]: s["node"] for s in GRAPH["stairs"]}
-    stairs = [{**{k: s[k] for k in ("id", "group", "n")}, "x": round(s["x"]), "y": round(s["y"]), "node": stair_node[s["id"]]} for s in MODEL["stairs"]]
+    lines, src = load_paths()
+    graph_from_lines(lines)
+    if src != "QGIS":  # в QGIS-файле ручные отрезки уже лежат слоем paths
+        add_extra_paths()
+    print(f"Дорожки: {src}, {len(lines)} линий")
+    pos = {a["id"]: to_px(g[1]) for g, a in read_gpkg("stairs") if g[0] == "Point"}
+    stairs = []
+    for s in MODEL["stairs"]:
+        x, y = pos.get(s["id"], (s["x"], s["y"]))
+        stairs.append({"id": s["id"], "group": s["group"], "n": s["n"], "x": round(x), "y": round(y), "node": nearest_node(x, y)})
     stacks = []
     for s in MODEL["stacks"]:
         xs = [p[0] for p in s["poly"]]; ys = [p[1] for p in s["poly"]]
@@ -69,10 +210,18 @@ def build():
         x1 = max(stacks[i]["box"][2] for i in idx); y1 = max(stacks[i]["box"][3] for i in idx)
         badges.append([b, round((x0 + x1) / 2), round((y0 + y1) / 2)])
     units = [{"num": u["num"], "code": u["code"], "floor": u["floor"], "kind": u["kind"], "stack": u["stack"]} for u in MODEL["units"]]
-    starts = [{**s, "node": nearest_node(s["x"], s["y"])} for s in CFG["starts"]]
+    starts = CFG["starts"]
+    q = read_gpkg("starts")
+    if q:
+        starts = [{"id": a["id"], "x": round(to_px(g[1])[0]), "y": round(to_px(g[1])[1]),
+                   "name": {l: a.get("name_" + l) or a["id"] for l in CFG["languages"]}} for g, a in q if g[0] == "Point"]
+    starts = [{**s, "node": nearest_node(s["x"], s["y"])} for s in starts]
+    pt = lambda layer: [{**{k: v for k, v in a.items() if k != "fid"}, "x": round(to_px(g[1])[0]), "y": round(to_px(g[1])[1])}
+                        for g, a in read_gpkg(layer) if g[0] == "Point" and a.get("id") != "EXAMPLE"]
+    lifts, water = pt("lifts"), pt("water_panels")
     payload = {"config": CFG, "size": [W, H], "metersPerPx": MODEL["metersPerPx"], "vector": VEC, "stacks": stacks, "stairs": stairs,
                "units": units, "pois": MODEL["pois"], "legend": MODEL["legend"], "badges": badges, "starts": starts,
-               "graph": {"nodes": NODES, "edges": EDGES}}
+               "graph": {"nodes": NODES, "edges": EDGES}, "lifts": lifts, "water": water}
     js = ("// Сгенерировано tools/build.py — не редактируйте вручную\nwindow.ZHK=" +
           json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n")
     (ROOT / "data/plan-data.js").write_text(js, encoding="utf-8")
@@ -144,4 +293,4 @@ if __name__ == "__main__":
     export_svg(P); export_csv(P)
     apts = sum(1 for u in P["units"] if u["kind"] == "apt")
     print(f"OK: {len(P['stacks'])} стояков, {apts} апартаментов, {len(P['units']) - apts} помещений, "
-          f"{len(P['stairs'])} лестниц, граф {len(P['graph']['nodes'])} узлов; plan-data.js {size // 1024} КБ")
+          f"{len(P['stairs'])} лестниц, {len(P['lifts'])} лифтов, {len(P['water'])} щитов воды, граф {len(P['graph']['nodes'])} узлов; plan-data.js {size // 1024} КБ")
