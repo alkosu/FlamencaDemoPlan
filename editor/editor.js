@@ -134,17 +134,25 @@ let route = null;   // {a:[x,y], b:[x,y] , path, len}
 let sel = null;      // {type:'lift'|'water'|'start'|'stair', key}
 let tool = 'move', drawing = null, hover = null, cursorPt = null;
 function renderGraph() {
+  // одна <path> на класс объектов: тысячи отдельных <line> рисуются слишком медленно
   G.edges.textContent = ''; G.nodes.textContent = '';
-  const fe = document.createDocumentFragment();
+  const r1 = v => Math.round(v * 10) / 10;
+  let open = '', closed = '', hl = '';
   D.edges.forEach((e, i) => { if (e.dead) return; const a = D.nodes[e.a], b = D.nodes[e.b];
-    el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'e' + (e.closed ? ' closed' : '') + (hover && hover.edge === i ? ' hl' : '') }, fe); });
-  G.edges.appendChild(fe);
-  const showN = $('vNodes').checked, showD = $('vDangle').checked, g = degree(), fn = document.createDocumentFragment();
-  D.nodes.forEach((n, i) => { if (!n) return; const dang = g[i] === 1, hl = (hover && hover.node === i) || (drawing && drawing.last === i);
-    if (!(showN || (showD && dang) || hl)) return;
-    if (!showN && !hl && !(showD && dang)) return;
-    el('line', { x1: n[0], y1: n[1], x2: n[0], y2: n[1], class: 'n' + (showD && dang ? ' dangle' : '') + (hl ? ' hl' : '') }, fn); });
-  G.nodes.appendChild(fn);
+    const seg = `M${r1(a[0])} ${r1(a[1])}L${r1(b[0])} ${r1(b[1])}`;
+    if (hover && hover.edge === i) hl += seg; else if (e.closed) closed += seg; else open += seg; });
+  if (open) el('path', { d: open, class: 'e', fill: 'none' }, G.edges);
+  if (closed) el('path', { d: closed, class: 'e closed', fill: 'none' }, G.edges);
+  if (hl) el('path', { d: hl, class: 'e hl', fill: 'none' }, G.edges);
+  const showN = $('vNodes').checked, showD = $('vDangle').checked, g = degree();
+  let dots = '', dang = '', hot = '';
+  D.nodes.forEach((n, i) => { if (!n) return; const dot = `M${r1(n[0])} ${r1(n[1])}h0`;
+    if ((hover && hover.node === i) || (drawing && drawing.last === i)) hot += dot;
+    else if (showD && g[i] === 1) dang += dot;
+    else if (showN) dots += dot; });
+  if (dots) el('path', { d: dots, class: 'n', fill: 'none' }, G.nodes);
+  if (dang) el('path', { d: dang, class: 'n dangle', fill: 'none' }, G.nodes);
+  if (hot) el('path', { d: hot, class: 'n hl', fill: 'none' }, G.nodes);
 }
 function renderMarks() {
   G.marks.textContent = ''; const s = Math.max(.6, Math.min(2.2, scale() * 1.6));
