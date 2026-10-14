@@ -208,8 +208,13 @@ const unitAt = (si, f) => UNITS.find(u => u.stack === si && u.floor === f);
 const label = u => u.kind === 'apt' ? String(u.num) : u.code.split(':')[1];
 const stairOf = u => STAIR[STACKS[u.stack].stair];
 const servesList = v => String(v || '').split(/[\s,;]+/).filter(Boolean);
-const liftOf = u => { const sid = STACKS[u.stack].stair;
-  return LIFTS.find(l => servesList(l.serves).includes(String(u.num))) || LIFTS.find(l => l.stair_id === sid && !servesList(l.serves).length) || null; };
+const LIFT_NEAR_M = 40;   // лифт без точной привязки к лестнице считается «своим», если он ближе 40 м к квартире
+const liftOf = u => { const sid = STACKS[u.stack].stair, c = STACKS[u.stack].c;
+  const byServe = LIFTS.find(l => servesList(l.serves).includes(String(u.num))); if (byServe) return byServe;
+  const byStair = LIFTS.find(l => l.stair_id === sid && !servesList(l.serves).length); if (byStair) return byStair;
+  let best = null, bd = LIFT_NEAR_M / M_PER_PX;
+  for (const l of LIFTS) { if (servesList(l.serves).length) continue; const d = Math.hypot(l.x - c[0], l.y - c[1]); if (d < bd) { bd = d; best = l; } }
+  return best; };
 const elecOf = u => ELEC.find(w => servesList(w.serves).includes(String(u.num))) || null;
 const waterOf = u => WATER.find(w => servesList(w.serves).includes(String(u.num)) || servesList(w.serves).includes(u.code)) || null;
 
@@ -330,7 +335,7 @@ function drawRoute(gR, sp, tx, ty, tnode, color) {
 /** крупная метка «↑3 E» / «↑3 L» над лестницей или лифтом */
 function floorBadge(g, x, y, floor, letter, color, dx = 0) {
   const o = el('g', { transform: `translate(${x} ${y})` }, g), k = el('g', { class: 'mk' }, o);
-  const t = el('g', { transform: `translate(${dx} -34)` }, k);
+  const t = el('g', { transform: `translate(${dx * .72} ${-34 * .72}) scale(.72)` }, k);
   el('path', { d: 'M-6 14L0 26 6 14Z', fill: color }, t);
   el('rect', { x: -27, y: -20, width: 54, height: 36, rx: 9, fill: color, stroke: '#fff', 'stroke-width': 3 }, t);
   el('text', { x: -4, y: 9, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, t).textContent = floor > 0 ? '↑' + floor : String(floor);
