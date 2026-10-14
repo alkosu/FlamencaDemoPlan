@@ -343,7 +343,7 @@ function floorBadge(g, x, y, floor, letter, color, dx = 0) {
 }
 const C_STAIR = '#2f7a4d', C_LIFT = '#1f4fd1';
 function render() {
-  renderStacks(); const gR = $('g-route'); gR.innerHTML = '';
+  renderStacks(); { const bg = document.querySelector('[data-layer="badges"]'); if (bg && !simple()) bg.style.display = state.apt ? 'none' : (on.has('badges') ? '' : 'none'); } const gR = $('g-route'); gR.innerHTML = '';
   const info = $('info');
   $('hit').innerHTML = state.apt ? `<b>${esc(T('bld')(STACKS[state.apt.stack].block))}</b><span>${esc(T('floorN')(state.apt.floor))}</span>` : '';
   if (!state.apt) { info.innerHTML = `<div class="note">${esc(simple() ? T('simpleEmpty') : T('proEmpty'))}</div>`; lastPts = null; return; }
@@ -485,7 +485,7 @@ const PRESETS = [
   ['apts', 'aptlabels', 'esc', 'lifts', 'bld', 'badges', 'walk', 'road'],
   ['apts', 'aptlabels', 'plain', 'esc', 'badges'],
   ['apts', 'esc', 'raster', 'graph']];
-const SIMPLE_LAYERS = new Set(['places', 'liftsdata', 'apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
+const SIMPLE_LAYERS = new Set(['places', 'liftsdata', 'apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
 PRESETS[0].push('liftsdata', 'places', 'panels'); PRESETS[1].push('liftsdata', 'places'); PRESETS[2].push('places');
 const on = new Set(PRESETS[0]); on.add('panels');
 const boxes = {};
