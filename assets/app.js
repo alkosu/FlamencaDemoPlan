@@ -170,8 +170,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const [W, H] = Z.size, M_PER_PX = Z.metersPerPx, WALK = CFG.walkSpeed;
 const STACKS = Z.stacks, STAIRS = Z.stairs, UNITS = Z.units, LIFTS = Z.lifts || [], WATER = Z.water || [], POINTS = Z.points || [];
 const ELEC = POINTS.filter(p => p.type === 'elec');
-const ENTRANCES = new Set(['jalon', 'picasso', 'south', 'north']);
-Z.starts.forEach(s => { if (!s.kind) s.kind = ENTRANCES.has(s.id) ? 'entrance' : 'place'; });
+const PLACES = new Set(['lagoon', 'pool51', 'pool10', 'pool14', 'office']);  // старые точки-места; всё остальное без типа — входы
+Z.starts.forEach(s => { if (!s.kind) s.kind = PLACES.has(s.id) ? 'place' : 'entrance'; });
 const GEO = window.FDPGeo ? FDPGeo.fit(Z.georef || [], Z.metersPerPx) : null;
 const STAIR = Object.fromEntries(STAIRS.map(s => [s.id, s]));
 const NODES = Z.graph.nodes;

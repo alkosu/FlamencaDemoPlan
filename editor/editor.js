@@ -45,9 +45,9 @@ function fromPublished() {
     points: [], info: emptyInfo(), georef: []
   };
 }
-const ENTRANCES = new Set(['jalon', 'picasso', 'south', 'north']);
+const PLACES = new Set(['lagoon', 'pool51', 'pool10', 'pool14', 'office']);
 function emptyInfo() { return Object.fromEntries(LANGS.map(l => [l, { title: '', text: '' }])); }
-function normStart(s) { return { kind: ENTRANCES.has(s.id) ? 'entrance' : 'place', info: '', link: '', ...s, name: { ...s.name } }; }
+function normStart(s) { return { kind: PLACES.has(s.id) ? 'place' : 'entrance', info: '', link: '', ...s, name: { ...s.name } }; }
 function fromFile(f) {
   if (!f || f.format !== 'flamenca-edits' || !f.graph) throw new Error('Это не файл правок навигатора (нет format: "flamenca-edits").');
   const d = fromPublished();
