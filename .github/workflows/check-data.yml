@@ -1,0 +1,23 @@
+name: Проверка данных
+
+# Проверяет, что data/complex.json корректен и данные собираются без ошибок.
+# Побайтовое сравнение с закоммиченным data/plan-data.js не делается:
+# разные версии OpenCV могут давать слегка разные контуры.
+on:
+  push:
+    paths: ["data/**", "source/**", "tools/**"]
+  pull_request:
+    paths: ["data/**", "source/**", "tools/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r tools/requirements.txt
+      - run: python tools/build.py
+      - name: Страница видит все квартиры
+        run: python -c "import json;s=open('data/plan-data.js',encoding='utf-8').read();d=json.loads(s[s.index('=')+1:].strip().rstrip(';'));n=sum(len(x['units']) for x in d['config']['stacks']);assert len(d['stacks'])==len(d['config']['stacks']);print(n,'квартир')"

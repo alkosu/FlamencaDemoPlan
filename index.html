@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Навигатор ЖК — корпуса 14–17</title>
+<meta name="description" content="Интерактивный план жилого комплекса: поиск квартиры, пеший маршрут до нужной лестницы, этажи и слои.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f4fd1'/%3E%3Cpath d='M9 23V12l7-4 7 4v11h-5v-6h-4v6z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="apptitle">Навигатор ЖК</h1>
+    <span class="sub" id="summary"></span>
+  </header>
+
+  <div class="grid">
+    <aside>
+      <div class="field">
+        <label class="lbl" for="q">Куда</label>
+        <input type="text" id="q" placeholder="Номер или код: 449, A3a-449" autocomplete="off" role="combobox" aria-controls="sugg" aria-expanded="false">
+        <div class="sugg" id="sugg" role="listbox" hidden></div>
+      </div>
+      <div>
+        <label class="lbl" for="from">Откуда</label>
+        <div class="row">
+          <select id="from"></select>
+          <button class="btn" id="pick" type="button" title="Кликните по плану, чтобы задать старт">На плане</button>
+        </div>
+      </div>
+      <div>
+        <span class="lbl">Этаж на плане</span>
+        <div class="seg full" id="floorseg"></div>
+      </div>
+      <div>
+        <span class="lbl">Какие квартиры показывать</span>
+        <div class="seg full" id="showseg"></div>
+      </div>
+      <div class="card" id="info"></div>
+    </aside>
+
+    <div class="mapbox">
+      <svg id="map" viewBox="0 0 1540 1048" role="img" aria-label="Векторный план комплекса с маршрутом">
+        <g id="world">
+          <g data-layer="neighbour"></g>
+          <path data-layer="site" id="sitebg" fill="#f2efe6"/>
+          <g data-layer="road"></g>
+          <g data-layer="walk"></g>
+          <g data-layer="lawn"></g>
+          <g data-layer="pool"></g>
+          <g data-layer="parking"></g>
+          <g data-layer="bld"></g>
+          <g data-layer="gallery"></g>
+          <image data-layer="raster" x="0" y="0" opacity=".6"/>
+          <g data-layer="sitebound"></g>
+          <g data-layer="apts" id="g-stacks"></g>
+          <g data-layer="aptlabels" id="g-stl"></g>
+          <g data-layer="graph" id="g-graph"></g>
+          <g id="g-route"></g>
+          <g data-layer="esc" id="g-esc"></g>
+          <g data-layer="labels" id="g-lab"></g>
+          <g id="g-starts"></g>
+        </g>
+      </svg>
+      <div class="layers" id="layers">
+        <button type="button" id="layerbtn" aria-expanded="true" aria-controls="layerbody">Слои <span aria-hidden="true" id="layerarrow">▾</span></button>
+        <div class="body" id="layerbody"></div>
+      </div>
+      <div class="mapctl">
+        <button id="zin" type="button" aria-label="Приблизить">+</button>
+        <button id="zout" type="button" aria-label="Отдалить">−</button>
+        <button id="zfit" type="button" aria-label="Показать весь план">⤢</button>
+      </div>
+      <div class="hint" id="hint" hidden>Кликните по плану — старт встанет на ближайшую дорожку</div>
+    </div>
+  </div>
+
+  <section class="reg">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <h2>Квартиры по этажам и доступ</h2>
+      <div class="row"><span class="toast" id="toast" aria-live="polite"></span><button class="btn" id="copycsv" type="button">Копировать CSV</button></div>
+    </div>
+    <div class="filters">
+      <select id="fb" aria-label="Корпус"></select>
+      <div class="seg" id="ff"></div>
+      <input type="text" id="ft" placeholder="Фильтр по коду" aria-label="Фильтр по коду" style="width:160px">
+      <span class="note" id="fcount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>№</th><th>Код</th><th>Корпус</th><th>Этаж</th><th>Стояк</th>
+          <th>Ближайшая лестница</th><th>Лифт*</th><th>Как пройти</th><th>От входа</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <p class="note" style="margin:0">
+      Вектор получен из картинки плана автоматически (разбор по цветам), контуры корпусов выровнены.
+      Этаж взят из цифры в коде: <span class="mono">A<b>3</b>a-449</span> → 3-й этаж, 0 — planta baja.
+      * Лифты на листе не обозначены; принято, что лифт стоит в ядре каждой лестницы.
+      <span class="flag">⚑ Escalera 2 корпуса 15 на плане не подписана.</span>
+      Расстояния приблизительные (~0,1 м на пиксель плана).
+    </p>
+  </section>
+</div>
+
+<script src="data/plan-data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
