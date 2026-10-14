@@ -329,7 +329,7 @@ function drawRoute(gR, sp, tx, ty, tnode, color) {
   const ps = pts.map(q => q.join(',')).join(' ');
   el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-width': 13, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
   el('polyline', { points: ps, fill: 'none', stroke: color, 'stroke-width': 7, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
-  el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-opacity': .55, 'stroke-width': 2.5, 'stroke-linecap': 'round', class: 'routeline' }, gR);
+  el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-width': 2.5, 'stroke-linecap': 'round', class: 'routeline' }, gR);
   return { pts, len };
 }
 /** крупная метка над лестницей или лифтом: иконка (лестница / стрелки вверх-вниз) и номер этажа */
@@ -355,8 +355,9 @@ function render() {
   const lx = lf ? lf.x : st.x, ly = lf ? lf.y : st.y;
   const sameSpot = Math.hypot(lx - st.x, ly - st.y) * M_PER_PX < 3;
   let lnode = st.node; if (!sameSpot) { const key = lx + ',' + ly; if (!liftNodeCache.has(key)) liftNodeCache.set(key, nearestNode(lx, ly)); lnode = liftNodeCache.get(key); }
-  const rs = drawRoute(gR, sp, st.x, st.y, st.node, up && sameSpot ? C_LIFT : C_STAIR);
-  const rl = up && !sameSpot ? drawRoute(gR, sp, lx, ly, lnode, C_LIFT) : rs;
+  const C_ROUTE = '#111';   // путь — чёрный с белой окантовкой и белым пунктиром, для лестницы и для лифта
+  const rs = drawRoute(gR, sp, st.x, st.y, st.node, C_ROUTE);
+  const rl = up && !sameSpot ? drawRoute(gR, sp, lx, ly, lnode, C_ROUTE) : rs;
   el('circle', { cx: sp.x, cy: sp.y, r: 11, fill: '#1d2420', stroke: '#fff', 'stroke-width': 3 }, gR);
   if (up && sameSpot) { floorBadge(gR, st.x, st.y, a.floor, 'stair', C_STAIR, -30); floorBadge(gR, st.x, st.y, a.floor, 'lift', C_LIFT, 30); }
   else { floorBadge(gR, st.x, st.y, a.floor, 'stair', C_STAIR); if (up) floorBadge(gR, lx, ly, a.floor, 'lift', C_LIFT); }
