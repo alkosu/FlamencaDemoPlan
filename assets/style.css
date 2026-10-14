@@ -68,25 +68,6 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
 .layers .grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:4px}
 .layers input[type=range]{width:100%}
 .hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:var(--accent);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;white-space:nowrap}
-/* реестр */
-section.reg{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-section.reg h2{font-size:16px;margin:0;font-weight:600}
-.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.filters select,.filters input{width:auto}
-.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;max-height:520px;overflow-y:auto}
-table{border-collapse:collapse;width:100%;min-width:860px}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{position:sticky;top:0;background:var(--chip);font-size:12px;font-weight:600;color:var(--muted);z-index:1}
-td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
-tbody tr{cursor:pointer}
-tbody tr:hover{background:var(--accent-soft)}
-tbody tr.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
-.pill{display:inline-block;padding:1px 7px;border-radius:999px;background:var(--chip);border:1px solid var(--line);font-size:12px;white-space:nowrap}
-.pill.e1{border-color:#3a8c5b;color:#2f7a4d} .pill.e2{border-color:#9a6a15;color:#8a5c0e}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.e1{color:#7fd3a0}:root:not([data-theme="light"]) .pill.e2{color:#e8b866}}
-:root[data-theme="dark"] .pill.e1{color:#7fd3a0} :root[data-theme="dark"] .pill.e2{color:#e8b866}
-.flag{color:var(--mark)}
-.toast{font-size:12px;color:var(--accent)}
 /* svg-стили плана (план — чертёж, палитра фиксированная в обеих темах) */
 .stk{fill:#fbf8f1;stroke:#8f846f;stroke-width:1.2;transition:fill .15s}
 .stk.e1{fill:#eef6ef}.stk.e2{fill:#fbf2e2}
@@ -137,3 +118,6 @@ header.top h1{font-size:18px;line-height:1.25;flex:1 1 220px;min-width:0}
   .mapctl button{width:40px;height:40px}
 }
 @media (max-width:380px){ .bignum{font-size:34px} .tile b{font-size:26px} .ctrls .seg button{padding:7px 10px} }
+
+.stk.loc{fill:#f3e4f2}
+.plain .stk.loc{fill:#f3e4f2}

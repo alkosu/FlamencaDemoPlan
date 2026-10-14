@@ -21,6 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---
-The plan image (source/plan.jpg) and the vector data derived from it
-(data/plan-data.js, export/*) are NOT covered by this license; they belong
+The master plan sheets (source/) and the data derived from them
+(data/master/, data/plan-data.js, export/*) are NOT covered by this license; they belong
 to the copyright holder of the residential complex design.

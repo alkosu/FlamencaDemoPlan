@@ -1,245 +1,147 @@
 #!/usr/bin/env python3
-"""Сборка данных навигатора из исходной картинки плана и ручной разметки.
+"""Сборка данных навигатора из сводной модели комплекса.
 
-Вход:   data/complex.json   — разметка (стояки, лестницы, сеть дорожек, точки старта…)
-        source/plan.jpg     — растровый план (путь задан в complex.json → image.file)
-Выход:  data/plan-data.js   — векторные слои + блоки квартир + конфиг для страницы
-        export/plan_layers.svg — тот же вектор отдельным файлом со слоями (Inkscape/Figma)
-        export/apartments.csv  — реестр квартир (этаж, лестница, доступ, расстояние)
+Вход:   data/complex.json        — настройки: заголовок, языки, точки старта
+        data/master/model.json   — стояки (контуры, коды квартир), лестницы, объекты легенды
+        data/master/vector.json  — векторные слои территории
+        data/master/graph.json   — сеть пешеходных дорожек, привязка лестниц
+Выход:  data/plan-data.js        — всё для страницы (window.ZHK)
+        export/plan_layers.svg   — сводный план со слоями (в т.ч. по этажам) для Inkscape/Figma
+        export/apartments.csv    — перечень апартаментов и помещений
 
-Запуск из корня репозитория:  python tools/build.py
+Только стандартная библиотека Python. Запуск из корня: python tools/build.py
 """
-import csv
-import heapq
-import json
-import math
-import re
+import csv, html, json, math, re
 from pathlib import Path
 
-import cv2
-import numpy as np
-
 ROOT = Path(__file__).resolve().parent.parent
-CFG = json.loads((ROOT / "data/complex.json").read_text(encoding="utf-8"))
-
-# Фиксированная палитра классов (BGR), подобрана k-means по исходному листу.
-# Каждый пиксель относится к ближайшему цвету — результат детерминирован.
-PALETTE = {
-    "building": (223, 237, 242), "parking": (127, 131, 129), "walk": (177, 202, 205),
-    "lawn": (69, 190, 168), "trees": (52, 162, 95), "white": (254, 254, 254),
-    "terrace": (142, 174, 180), "pool": (245, 217, 127), "deck": (103, 130, 178),
-    "nbwater": (204, 219, 216), "boundary": (27, 38, 110), "gallery": (153, 217, 234),
-    "hedge": (61, 128, 129), "road": (232, 230, 227),
-}
-NAMES = list(PALETTE)
+rd = lambda p: json.loads((ROOT / p).read_text(encoding="utf-8"))
+CFG, MODEL, VEC, GRAPH = rd("data/complex.json"), rd("data/master/model.json"), rd("data/master/vector.json"), rd("data/master/graph.json")
+W, H = MODEL["size"]
+NODES = [list(p) for p in GRAPH["nodes"]]
+EDGES = [list(e) for e in GRAPH["edges"]]
 
 
-def kernel(n):
-    return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (n, n))
+def nearest_node(x, y):
+    return min(range(len(NODES)), key=lambda i: (NODES[i][0] - x) ** 2 + (NODES[i][1] - y) ** 2)
 
 
-def segment(img):
-    blur = cv2.medianBlur(img, 5).reshape(-1, 3).astype(np.float32)
-    centers = np.array([PALETTE[n] for n in NAMES], np.float32)
-    lab = np.empty(blur.shape[0], np.int32)
-    for i in range(0, blur.shape[0], 200_000):  # по частям, чтобы не раздувать память
-        chunk = blur[i:i + 200_000]
-        lab[i:i + 200_000] = ((chunk[:, None, :] - centers[None]) ** 2).sum(2).argmin(1)
-    return lab.reshape(img.shape[:2])
+def poly_d(P):
+    return "M" + " ".join(f"{x:.0f},{y:.0f}" for x, y in P) + "Z"
 
 
-def poly_mask(shape, pts):
-    m = np.zeros(shape, np.uint8)
-    cv2.fillPoly(m, [np.array(pts, np.int32)], 255)
-    return m
+def add_extra_paths():
+    """Ручные отрезки из complex.json → новые узлы и рёбра сети."""
+    for line in CFG.get("extraPaths", {}).get("paths", []):
+        ends = [nearest_node(*line[0]), nearest_node(*line[-1])]
+        ids = []
+        for x, y in line:
+            NODES.append([round(x), round(y)]); ids.append(len(NODES) - 1)
+        EDGES.append([ends[0], ids[0]]); EDGES.append([ids[-1], ends[1]])
+        EDGES.extend([a, b] for a, b in zip(ids, ids[1:]))
 
 
-def to_path(contours, eps, minarea):
-    out = []
-    for c in contours:
-        if abs(cv2.contourArea(c)) < minarea:
-            continue
-        a = cv2.approxPolyDP(c, eps, True).reshape(-1, 2) if eps else c.reshape(-1, 2)
-        if len(a) >= 3:
-            out.append("M" + " ".join(f"{x},{y}" for x, y in a) + "Z")
-    return "".join(out)
-
-
-def organic(mask, eps=1.5, minarea=150):
-    cs, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-    return to_path(cs, eps, minarea)
-
-
-def ortho(mask, cell=3, minarea=300, smooth=True):
-    """Ортогонализация: маска огрубляется до сетки cell×cell — контуры зданий получаются прямоугольными."""
-    h, w = mask.shape
-    small = cv2.resize((mask > 0).astype(np.float32), (w // cell, h // cell), interpolation=cv2.INTER_AREA)
-    s = (small > 0.5).astype(np.uint8) * 255
-    if smooth:
-        k = np.ones((3, 3), np.uint8)
-        s = cv2.morphologyEx(cv2.morphologyEx(s, cv2.MORPH_OPEN, k), cv2.MORPH_CLOSE, k)
-    cs, _ = cv2.findContours(s, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-    cs = [c * cell for c in cs]
-    return to_path(cs, 0, minarea)
-
-
-def vectorize(img):
-    lab = segment(img)
-    shape = lab.shape
-    m = lambda *names: np.isin(lab, [NAMES.index(n) for n in names]).astype(np.uint8) * 255
-
-    site = poly_mask(shape, CFG["site"])
-    zone = poly_mask(shape, CFG["neighbourZone"])
-
-    def clean(mask, close=5, open_=3, clip=site):
-        mask = cv2.bitwise_and(mask, clip)
-        if close:
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel(close))
-        if open_:
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel(open_))
-        return mask
-
-    nonwhite = cv2.morphologyEx(255 - m("white"), cv2.MORPH_CLOSE, kernel(9))
-    vec = {
-        "site": "M" + " ".join(f"{x},{y}" for x, y in CFG["site"]) + "Z",
-        "road": organic(clean(m("road"), 7, 5), 1.5, 300),
-        "parking": organic(clean(m("parking"), 5, 5), 2.5, 300),
-        "walk": organic(clean(m("walk"), 7, 5), 1.5, 200),
-        "lawn": organic(clean(m("lawn", "hedge"), 5, 5), 1.5, 150),
-        "trees": organic(clean(m("trees"), 3, 5), 1.5, 120),
-        "pool": organic(clean(m("pool"), 3, 3), 1, 60),
-        "deck": organic(clean(m("deck"), 7, 5), 1.5, 200),
-        "bldbody": ortho(clean(m("building", "terrace"), 11, 5), 3, 800),
-        "terrace": ortho(clean(m("terrace"), 5, 5), 3, 200),
-        "gallery": ortho(clean(m("gallery"), 5, 3), 3, 120, smooth=False),
-        "neighbour": organic(cv2.morphologyEx(cv2.bitwise_and(nonwhite, zone), cv2.MORPH_OPEN, kernel(7)), 2, 2000),
-        "nbwater": organic(cv2.bitwise_and(cv2.morphologyEx(m("nbwater"), cv2.MORPH_OPEN, kernel(7)), zone), 2, 800),
-    }
-
-    body = cv2.morphologyEx(m("building", "terrace"), cv2.MORPH_CLOSE, kernel(11))
+def build():
+    add_extra_paths()
+    stair_node = {s["id"]: s["node"] for s in GRAPH["stairs"]}
+    stairs = [{**{k: s[k] for k in ("id", "group", "n")}, "x": round(s["x"]), "y": round(s["y"]), "node": stair_node[s["id"]]} for s in MODEL["stairs"]]
     stacks = []
-    for s in CFG["stacks"]:
-        x0, y0, x1, y1 = s["cut"]
-        cut = np.zeros_like(body)
-        cut[y0:y1, x0:x1] = 255
-        d = ortho(cv2.bitwise_and(body, cut), 3, 400)
-        polys = [np.array([[int(v) for v in p.split(",")] for p in poly.split()], np.int32)
-                 for poly in re.findall(r"M([^Z]+)Z", d)]
-        if not polys:
-            raise SystemExit(f"Стояк {s['units'][0]}: в области cut не найдено здание — проверьте координаты")
-        big = max(polys, key=lambda p: abs(cv2.contourArea(p)))
-        mo = cv2.moments(big)
-        _, _, w, h = cv2.boundingRect(big)
-        stacks.append({"d": d, "c": [round(mo["m10"] / mo["m00"]), round(mo["m01"] / mo["m00"])], "w": w, "h": h})
-    return vec, stacks
-
-
-# ---------- реестр квартир (та же логика, что в assets/app.js) ----------
-def dijkstra(src):
-    nodes, adj = CFG["network"]["nodes"], {k: [] for k in CFG["network"]["nodes"]}
-    for a, b in CFG["network"]["edges"]:
-        w = math.dist(nodes[a], nodes[b])
-        adj[a].append((b, w))
-        adj[b].append((a, w))
-    dist = {k: math.inf for k in nodes}
-    dist[src] = 0
-    pq = [(0, src)]
-    while pq:
-        du, u = heapq.heappop(pq)
-        if du > dist[u]:
-            continue
-        for v, w in adj[u]:
-            if du + w < dist[v]:
-                dist[v] = du + w
-                heapq.heappush(pq, (dist[v], v))
-    return dist
-
-
-def tr(v, lang="ru"):
-    """Строка из complex.json: либо просто текст, либо {"ru":…, "en":…, …}."""
-    return v.get(lang) or next(iter(v.values())) if isinstance(v, dict) else v
-
-
-def apartments(stacks):
-    esc = CFG["escaleras"]
-    dist = dijkstra(CFG["starts"][0]["node"])
-    rows = []
-    for s, geo in zip(CFG["stacks"], stacks):
-        base = s["building"].split(".")[0]
-        key = min((k for k, e in esc.items() if e["building"] == base),
-                  key=lambda k: math.dist((esc[k]["x"], esc[k]["y"]), geo["c"]))
-        e = esc[key]
-        for code in s["units"]:
-            mm = re.match(r"^([A-Z])(\d)([a-z]?)-(\d+)$", code)
-            floor = int(mm.group(2))
-            rows.append({
-                "num": int(mm.group(4)), "code": code, "building": s["building"], "floor": floor,
-                "stack": re.sub(r"\d", "", s["units"][0]).split("-")[0],
-                "stair": f"Escalera {e['n']}" + (" (на плане не подписана)" if e.get("unlabeled") else ""),
-                "lift": "не нужен" if floor == 0 else f"у Escalera {e['n']} (предположительно)",
-                "access": tr(CFG["access"][s["building"]]).replace("{n}", str(e["n"]))
-                          + (" (уровень входа)" if floor == 0 else f" → {floor} этаж"),
-                "meters": round(dist[e["node"]] * CFG["image"]["metersPerPx"]),
-            })
-    return sorted(rows, key=lambda r: r["num"])
-
-
-def layered_svg(vec, stacks):
-    W, H = CFG["image"]["width"], CFG["image"]["height"]
-    layers = [
-        ("neighbour", "Соседний участок", [("neighbour", "#e9ece5"), ("nbwater", "#cfe3ec")]),
-        ("site", "Фон участка", [("site", "#f2efe6")]), ("road", "Проезды", [("road", "#d3d6d3")]),
-        ("walk", "Пешеходные дорожки", [("walk", "#e9dcbd")]),
-        ("lawn", "Озеленение", [("lawn", "#bcd592"), ("trees", "#79a858")]),
-        ("pool", "Бассейн", [("deck", "#cdb79b"), ("pool", "#57c1ea")]),
-        ("parking", "Парковка", [("parking", "#848985")]),
-        ("buildings", "Корпуса и террасы", [("bldbody", "#e7e1d3"), ("terrace", "#d9cfbb")]),
-        ("gallery", "Галереи и лестничные ядра", [("gallery", "#efd57c")]),
-    ]
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
-           f'viewBox="0 0 {W} {H}" width="{W}" height="{H}">']
-    for gid, name, parts in layers:
-        out.append(f'<g id="{gid}" inkscape:groupmode="layer" inkscape:label="{name}">'
-                   + "".join(f'<path id="{k}" d="{vec[k]}" fill="{c}" fill-rule="evenodd"/>' for k, c in parts) + "</g>")
-    out.append(f'<g id="boundary" inkscape:groupmode="layer" inkscape:label="Граница участка"><path d="{vec["site"]}" '
-               'fill="none" stroke="#9a3b2b" stroke-width="2.5" stroke-dasharray="10 6"/></g>')
-    out.append('<g id="apartments" inkscape:groupmode="layer" inkscape:label="Квартиры (стояки)">')
-    for s, g in zip(CFG["stacks"], stacks):
-        top = s["units"][0]
-        out.append(f'<g id="stack-{s["building"]}-{top}" data-building="{s["building"]}" data-units="{" ".join(s["units"])}">'
-                   f'<path d="{g["d"]}" fill="#fbf8f1" stroke="#8f846f" stroke-width="1.2"/>'
-                   f'<text x="{g["c"][0]}" y="{g["c"][1] + 4}" text-anchor="middle" font-family="IBM Plex Mono,monospace" '
-                   f'font-size="11">{top}</text></g>')
-    out.append("</g></svg>")
-    return "".join(out)
-
-
-def main():
-    img = cv2.imread(str(ROOT / CFG["image"]["file"]))
-    if img is None:
-        raise SystemExit(f"Не найден файл плана: {CFG['image']['file']}")
-    if img.shape[1] != CFG["image"]["width"] or img.shape[0] != CFG["image"]["height"]:
-        raise SystemExit("Размер картинки не совпадает с image.width/height в complex.json")
-    vec, stacks = vectorize(img)
-
-    payload = {"config": CFG, "vector": vec, "stacks": stacks}
-    js = ("// Сгенерировано tools/build.py — не редактируйте вручную, правьте data/complex.json\n"
-          "window.ZHK=" + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n")
+    for s in MODEL["stacks"]:
+        xs = [p[0] for p in s["poly"]]; ys = [p[1] for p in s["poly"]]
+        w, h = max(xs) - min(xs), max(ys) - min(ys)
+        stacks.append({"block": s["block"], "phase": s["phase"], "kind": s["kind"], "units": s["units"], "stair": s["stair"],
+                       "d": poly_d(s["poly"]), "c": [round(v) for v in s["c"]], "box": [round(min(xs)), round(min(ys)), round(max(xs)), round(max(ys))],
+                       "w": round(min(w, h)), "axis": "x" if w >= h else "y"})
+    # соседи: квартира и два ближайших стояка того же корпуса (по оси корпуса)
+    by_block = {}
+    for i, s in enumerate(stacks):
+        by_block.setdefault(s["block"], []).append(i)
+    for b, idx in by_block.items():
+        xs = [stacks[i]["c"][0] for i in idx]; ys = [stacks[i]["c"][1] for i in idx]
+        ax = 0 if (max(xs) - min(xs)) >= (max(ys) - min(ys)) else 1
+        idx.sort(key=lambda i: stacks[i]["c"][ax])
+        for k, i in enumerate(idx):
+            st = max(0, min(k - 1, len(idx) - 3))
+            stacks[i]["near"] = idx[st:st + 3]
+    badges = []
+    for b, idx in by_block.items():
+        x0 = min(stacks[i]["box"][0] for i in idx); y0 = min(stacks[i]["box"][1] for i in idx)
+        x1 = max(stacks[i]["box"][2] for i in idx); y1 = max(stacks[i]["box"][3] for i in idx)
+        badges.append([b, round((x0 + x1) / 2), round((y0 + y1) / 2)])
+    units = [{"num": u["num"], "code": u["code"], "floor": u["floor"], "kind": u["kind"], "stack": u["stack"]} for u in MODEL["units"]]
+    starts = [{**s, "node": nearest_node(s["x"], s["y"])} for s in CFG["starts"]]
+    payload = {"config": CFG, "size": [W, H], "metersPerPx": MODEL["metersPerPx"], "vector": VEC, "stacks": stacks, "stairs": stairs,
+               "units": units, "pois": MODEL["pois"], "legend": MODEL["legend"], "badges": badges, "starts": starts,
+               "graph": {"nodes": NODES, "edges": EDGES}}
+    js = ("// Сгенерировано tools/build.py — не редактируйте вручную\nwindow.ZHK=" +
+          json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n")
     (ROOT / "data/plan-data.js").write_text(js, encoding="utf-8")
+    return payload, len(js)
 
+
+def export_svg(P):
+    L = lambda gid, name, body, vis=True: (f'<g id="{gid}" inkscape:groupmode="layer" inkscape:label="{name}"'
+                                           f'{"" if vis else " style=&quot;display:none&quot;".replace("&quot;", chr(34))}>{body}</g>')
+    path = lambda d, fill, extra="": f'<path d="{d}" fill="{fill}" fill-rule="evenodd"{extra}/>'
+    V = P["vector"]
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" viewBox="0 0 {W} {H}" width="{W}" height="{H}">',
+           '<style>text{font-family:"IBM Plex Mono",monospace}</style>',
+           L("raster", "Исходные планы (подложка)", f'<image href="../source/master.jpg" width="{W}" height="{H}" opacity="0.6"/>', False),
+           L("road", "Проезды", path(V["road"], "#d3d6d3")), L("walk", "Пешеходные дорожки", path(V["walk"], "#e9dcbd")),
+           L("lawn", "Озеленение", path(V["lawn"], "#bcd592") + path(V["trees"], "#79a858")),
+           L("pool", "Бассейны и пляжи", path(V["deck"], "#cdb79b") + path(V["pool"], "#57c1ea", ' stroke="#2e95c2" stroke-width="1.5"')),
+           L("parking", "Парковка", path(V["parking"], "#848985")),
+           L("buildings", "Корпуса и террасы", path(V["bldbody"], "#e7e1d3", ' stroke="#a99d86" stroke-width="1"') + path(V["terrace"], "#d9cfbb")),
+           L("gallery", "Галереи и лестничные ядра", path(V["gallery"], "#efd57c", ' stroke="#c9a93f" stroke-width=".8"'))]
+    unit_by_stack = {}
+    for u in P["units"]:
+        unit_by_stack.setdefault(u["stack"], {})[u["floor"]] = u
+    for f in range(4):
+        g = []
+        for i, s in enumerate(P["stacks"]):
+            u = unit_by_stack[i].get(f)
+            if not u: continue
+            lab = str(u["num"]) if u["kind"] == "apt" else u["code"].split(":")[1]
+            g.append(f'<g id="u-{html.escape(u["code"])}" data-block="{s["block"]}" data-stair="{s["stair"] or ""}">'
+                     f'<path d="{s["d"]}" fill="{"#e6eefb" if s["kind"] == "apt" else "#f3e4f2"}" stroke="#57627a" stroke-width="1.4"/>'
+                     f'<text x="{s["c"][0]}" y="{s["c"][1] + 6}" text-anchor="middle" font-size="17">{html.escape(lab)}</text></g>')
+        out.append(L(f"floor{f}", "Этаж 0 (planta baja)" if f == 0 else f"Этаж {f}", "".join(g), f == 0))
+    out.append(L("stairs", "Лестницы", "".join(
+        f'<g><rect x="{s["x"] - 10}" y="{s["y"] - 10}" width="20" height="20" rx="4" fill="#2f7a4d" stroke="#fff" stroke-width="2"/>'
+        f'<text x="{s["x"]}" y="{s["y"] + 4}" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">E{s["n"]}</text>'
+        f'<title>Escalera {s["n"]} · корпус {s["group"]}</title></g>' for s in P["stairs"])))
+    out.append(L("lifts", "Лифты (условно, у лестниц)", "".join(
+        f'<g><rect x="{s["x"] + 11}" y="{s["y"] - 9}" width="16" height="18" rx="2" fill="#1f4fd1" stroke="#fff" stroke-width="2"/>'
+        f'<text x="{s["x"] + 19}" y="{s["y"] + 4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">L</text></g>' for s in P["stairs"])))
+    out.append(L("pois", "Объекты инфраструктуры", "".join(
+        f'<g><circle cx="{q["x"]}" cy="{q["y"]}" r="13" fill="#fff" stroke="#3a3f3b" stroke-width="1.5"/>'
+        f'<text x="{q["x"]}" y="{q["y"] + 4}" text-anchor="middle" font-size="{11 if len(q["code"]) < 3 else 9}" fill="#3a3f3b">{q["code"]}</text>'
+        f'<title>{q["code"]} — {html.escape(P["legend"].get(q["code"], {}).get("ru", ""))}</title></g>' for q in P["pois"])))
+    out.append(L("blocks", "Номера корпусов", "".join(
+        f'<g><rect x="{x - 24}" y="{y - 15}" width="48" height="30" rx="15" fill="#2b2f2c" stroke="#fff" stroke-width="2.5"/>'
+        f'<text x="{x}" y="{y + 6}" text-anchor="middle" font-size="16" fill="#fff" font-family="IBM Plex Sans,sans-serif">{b}</text></g>' for b, x, y in P["badges"])))
+    out.append("</svg>")
     (ROOT / "export").mkdir(exist_ok=True)
-    (ROOT / "export/plan_layers.svg").write_text(layered_svg(vec, stacks), encoding="utf-8")
+    (ROOT / "export/plan_layers.svg").write_text("".join(out), encoding="utf-8")
 
-    rows = apartments(stacks)
-    head = {"num": "№", "code": "Код", "building": "Корпус", "floor": "Этаж", "stack": "Стояк", "stair": "Лестница",
-            "lift": "Лифт", "access": "Как пройти", "meters": "От входа, м"}
-    with open(ROOT / "export/apartments.csv", "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=list(head), delimiter=";")
-        w.writerow(head)
-        w.writerows(rows)
 
-    print(f"OK: {len(stacks)} стояков, {len(rows)} квартир, plan-data.js {len(js) // 1024} КБ")
+def export_csv(P):
+    stair = {s["id"]: s for s in P["stairs"]}
+    rows = sorted(MODEL["units"], key=lambda u: (u["kind"] != "apt", u["num"] if u["kind"] == "apt" else int(u["num"][1:])))
+    with open(ROOT / "export/apartments.csv", "w", newline="", encoding="utf-8-sig") as fh:
+        w = csv.writer(fh, delimiter=";")
+        w.writerow(["№", "Код", "Тип", "Фаза", "Корпус", "Этаж", "Лестница", "Лифт (предп.)"])
+        for u in rows:
+            s = stair.get(u["stair"])
+            w.writerow([u["num"], u["code"], "апартамент" if u["kind"] == "apt" else "коммерческое помещение",
+                        u["phase"] if u["phase"] < 4 else "корпуса 14–17", u["block"], u["floor"],
+                        f"Escalera {s['n']} ({s['id']})" if s else "—",
+                        ("не нужен" if u["floor"] == 0 else f"у Escalera {s['n']}") if s else "—"])
 
 
 if __name__ == "__main__":
-    main()
+    P, size = build()
+    export_svg(P); export_csv(P)
+    apts = sum(1 for u in P["units"] if u["kind"] == "apt")
+    print(f"OK: {len(P['stacks'])} стояков, {apts} апартаментов, {len(P['units']) - apts} помещений, "
+          f"{len(P['stairs'])} лестниц, граф {len(P['graph']['nodes'])} узлов; plan-data.js {size // 1024} КБ")

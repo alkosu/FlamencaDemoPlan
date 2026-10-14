@@ -1,13 +1,12 @@
 name: Проверка данных
 
-# Проверяет, что data/complex.json корректен и данные собираются без ошибок.
-# Побайтовое сравнение с закоммиченным data/plan-data.js не делается:
-# разные версии OpenCV могут давать слегка разные контуры.
+# Пересобирает data/plan-data.js и export/* из data/complex.json и data/master/*.json
+# и проверяет, что в модели есть все апартаменты 1–506.
 on:
   push:
-    paths: ["data/**", "source/**", "tools/**"]
+    paths: ["data/**", "tools/**"]
   pull_request:
-    paths: ["data/**", "source/**", "tools/**"]
+    paths: ["data/**", "tools/**"]
 
 jobs:
   build:
@@ -17,7 +16,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r tools/requirements.txt
       - run: python tools/build.py
-      - name: Страница видит все квартиры
-        run: python -c "import json;s=open('data/plan-data.js',encoding='utf-8').read();d=json.loads(s[s.index('=')+1:].strip().rstrip(';'));n=sum(len(x['units']) for x in d['config']['stacks']);assert len(d['stacks'])==len(d['config']['stacks']);print(n,'квартир')"
+      - name: Все апартаменты на месте
+        run: python -c "import json;s=open('data/plan-data.js',encoding='utf-8').read();d=json.loads(s[s.index('=')+1:].strip().rstrip(';'));n=sorted(u['num'] for u in d['units'] if u['kind']=='apt');assert n==list(range(1,507)),n[:5];print(len(n),'апартаментов')"
