@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flamenca Village · Pro</title>
+<meta http-equiv="refresh" content="0; url=../?mode=pro&amp;lock=1">
+<script>
+  // переносим ?lang=… и #номер на основную страницу; режим закреплён
+  var q = new URLSearchParams(location.search); q.set('mode', 'pro'); q.set('lock', '1');
+  location.replace('../?' + q.toString() + location.hash);
+</script>
+</head>
+<body><p><a href="../?mode=pro&amp;lock=1">Flamenca Village · Pro</a></p></body>
+</html>

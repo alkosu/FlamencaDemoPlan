@@ -39,20 +39,27 @@ function fromPublished() {
     nodes: Z.graph.nodes.map(p => [p[0], p[1]]),
     edges: Z.graph.edges.map(([a, b]) => ({ a, b, closed: false })),
     stairs: Object.fromEntries(Z.stairs.map(s => [s.id, [s.x, s.y]])),
-    starts: Z.starts.map(s => ({ id: s.id, x: s.x, y: s.y, name: { ...s.name } })),
+    starts: Z.starts.map(s => normStart({ id: s.id, x: s.x, y: s.y, name: s.name })),
     lifts: (Z.lifts || []).map(l => ({ ...l })),
-    water: (Z.water || []).map(w => ({ ...w }))
+    water: (Z.water || []).map(w => ({ ...w })),
+    points: [], info: emptyInfo(), georef: []
   };
 }
+const ENTRANCES = new Set(['jalon', 'picasso', 'south', 'north']);
+function emptyInfo() { return Object.fromEntries(LANGS.map(l => [l, { title: '', text: '' }])); }
+function normStart(s) { return { kind: ENTRANCES.has(s.id) ? 'entrance' : 'place', info: '', link: '', ...s, name: { ...s.name } }; }
 function fromFile(f) {
   if (!f || f.format !== 'flamenca-edits' || !f.graph) throw new Error('Это не файл правок навигатора (нет format: "flamenca-edits").');
   const d = fromPublished();
   d.nodes = f.graph.nodes.map(p => [+p[0], +p[1]]);
   d.edges = f.graph.edges.map(([a, b]) => ({ a, b, closed: false })).concat((f.graph.closed || []).map(([a, b]) => ({ a, b, closed: true })));
   if (f.stairs) for (const k in f.stairs) if (d.stairs[k]) d.stairs[k] = f.stairs[k];
-  if (f.starts) d.starts = f.starts.map(s => ({ id: s.id, x: s.x, y: s.y, name: { ...s.name } }));
+  if (f.starts) d.starts = f.starts.map(normStart);
   d.lifts = (f.lifts || []).map(l => ({ ...l }));
-  d.water = (f.water || []).map(w => ({ ...w }));
+  d.water = (f.water || []).map(w => ({ info: '', link: '', ...w }));
+  d.points = (f.points || []).map(p => ({ ...p }));
+  d.info = Object.assign(emptyInfo(), clone(f.info || {}));
+  d.georef = ((f.georef && f.georef.points) || []).map(p => ({ ...p }));
   return d;
 }
 function toFile() {
@@ -67,7 +74,10 @@ function toFile() {
     stairs: Object.fromEntries(Object.entries(D.stairs).map(([k, p]) => [k, [r(p[0]), r(p[1])]])),
     starts: D.starts.map(s => ({ ...s, x: r(s.x), y: r(s.y) })),
     lifts: D.lifts.map(l => ({ ...l, x: r(l.x), y: r(l.y) })),
-    water: D.water.map(w => ({ ...w, x: r(w.x), y: r(w.y) })) };
+    water: D.water.map(w => ({ ...w, x: r(w.x), y: r(w.y) })),
+    points: D.points.map(q => ({ ...q, x: r(q.x), y: r(q.y) })),
+    info: D.info,
+    georef: { points: D.georef.map(q => ({ ...q, x: r(q.x), y: r(q.y) })) } };
 }
 
 let D, SRC = 'опубликованный план';
@@ -163,7 +173,16 @@ function renderMarks() {
   D.starts.forEach((p, i) => box(p.x, p.y, '▶', '#1d2420', 'start:' + i));
   D.lifts.forEach((p, i) => box(p.x, p.y, 'L', '#1f4fd1', 'lift:' + i));
   D.water.forEach((p, i) => box(p.x, p.y, 'W', '#2e95c2', 'water:' + i, true));
+  D.points.forEach((p, i) => { const k = PT[p.type] || PT.info; box(p.x, p.y, k.glyph, k.color, 'pt:' + i, k.round); });
+  const gf = geoFit();
+  D.georef.forEach((p, i) => { const g = el('g', { class: 'mk' + (sel && sel.key === 'geo:' + i ? ' sel' : ''), transform: `translate(${p.x} ${p.y}) scale(${s})` }, G.marks);
+    const ok = typeof p.lat === 'number'; el('circle', { r: 9, fill: 'none', stroke: ok ? '#c0392b' : '#999', 'stroke-width': 2.5 }, g);
+    el('path', { d: 'M-14 0H14M0-14V14', stroke: ok ? '#c0392b' : '#999', 'stroke-width': 2 }, g);
+    el('text', { x: 13, y: -10, 'font-size': 11, fill: '#c0392b' }, g).textContent = (i + 1) + (gf && ok ? ` · ${gf.residuals[gf.idx[i]].toFixed(1)} м` : ''); });
 }
+const PT = { elec: { glyph: 'E', color: '#d99a00', label: 'Электрический щит' }, info: { glyph: 'i', color: '#6d4bd1', label: 'Информация', round: true }, garage: { glyph: 'G', color: '#4a5560', label: 'Въезд в гараж' } };
+function geoFit() { if (!window.FDPGeo) return null; const idx = [], pts = []; D.georef.forEach((p, i) => { if (typeof p.lat === 'number' && typeof p.lon === 'number') { idx[i] = pts.length; pts.push(p); } });
+  const f = FDPGeo.fit(pts, MPP); if (f) f.idx = idx; return f; }
 function renderRoute() {
   G.route.textContent = '';
   if (!route) return;
@@ -179,7 +198,7 @@ function setStats(extra) {
   $('stats').textContent = `Источник: ${SRC} · узлов ${nn} · отрезков ${live.length - cl}${cl ? ` + закрытых ${cl}` : ''} · лифтов ${D.lifts.length} · щитов воды ${D.water.length} · точек старта ${D.starts.length}${extra ? ' · ' + extra : ''}`;
   $('srcNote').textContent = 'Сейчас загружено: ' + SRC;
 }
-function renderAll() { renderGraph(); renderMarks(); renderRoute(); renderRubber(); setStats(); renderProps(); if (tab === 'objs') renderObjs(); }
+function renderAll() { renderGraph(); renderMarks(); renderRoute(); renderRubber(); setStats(); renderProps(); if (tab === 'objs') renderObjs(); if (tab === 'geo') renderGeo(); }
 
 /* ================= инструменты ================= */
 const ICON = {
@@ -187,9 +206,13 @@ const ICON = {
   delete: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>', close: '<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 018 0v3"/>',
   route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h5a3 3 0 000-6h-2a3 3 0 010-6h5"/>',
   lift: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 10l3-3 3 3M9 14l3 3 3-3"/>',
-  water: '<path d="M12 3s6 7 6 11a6 6 0 01-12 0c0-4 6-11 6-11z"/>', start: '<path d="M6 21V4h10l-2 4 2 4H6"/>'
+  water: '<path d="M12 3s6 7 6 11a6 6 0 01-12 0c0-4 6-11 6-11z"/>', start: '<path d="M6 21V4h10l-2 4 2 4H6"/>',
+  elec: '<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  garage: '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 16h10"/>', geo: '<circle cx="12" cy="12" r="7"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/>'
 };
-const TOOLS = [['move', 'Выбрать и двигать (V)', 'V'], ['draw', 'Рисовать дорожку (D)', 'D'], ['delete', 'Удалить (X)', 'X'], ['close', 'Закрыть / открыть проход (C)', 'C'], ['route', 'Проверить маршрут (R)', 'R'], null, ['lift', 'Поставить лифт (L)', 'L'], ['water', 'Поставить щит воды (W)', 'W'], ['start', 'Точка «Откуда» (S)', 'S']];
+const TOOLS = [['move', 'Выбрать и двигать (V)', 'V'], ['draw', 'Рисовать дорожку (D)', 'D'], ['delete', 'Удалить (X)', 'X'], ['close', 'Закрыть / открыть проход (C)', 'C'], ['route', 'Проверить маршрут (R)', 'R'], null,
+  ['start', 'Вход / точка «Откуда» (S)', 'S'], ['info', 'Информация i (I)', 'I'], ['garage', 'Въезд в гараж (G)', 'G'], ['lift', 'Лифт (L)', 'L'], ['water', 'Щит воды (W)', 'W'], ['elec', 'Электрический щит (E)', 'E'], null,
+  ['geo', 'Точка привязки к местности (P)', 'P']];
 const HINT = {
   move: 'Перетаскивайте узлы, лестницы, лифты, щиты и точки старта. Клик по значку — свойства. Пустое место тянется — план двигается.',
   draw: 'Кликайте по точкам дорожки. Начало и конец прилипают к узлам и отрезкам. <b>Enter</b>, <b>Esc</b> или повторный клик по последней точке — закончить линию.',
@@ -197,7 +220,11 @@ const HINT = {
   close: 'Клик по отрезку закрывает его (калитка, нет прохода) — красный пунктир. Повторный клик открывает.',
   route: 'Кликните старт и финиш — маршрут построится так же, как в навигаторе.',
   lift: 'Клик — новый лифт. Его привязка к лестнице выбирается справа.', water: 'Клик — новый щит воды. Справа укажите квартиры, которые он обслуживает.',
-  start: 'Клик — новая точка «Откуда». Названия на четырёх языках задаются справа.'
+  start: 'Клик — новый вход или точка «Откуда». Справа — названия на четырёх языках, тип, информация и ссылка.',
+  elec: 'Клик — новый электрический щит. Виден в навигаторе только в режиме Pro.',
+  info: 'Клик — новая точка «i». В навигаторе по клику откроется окно с вашим текстом и ссылкой.',
+  garage: 'Клик — новый въезд в гараж. Справа — название, информация и ссылка.',
+  geo: 'Клик по узнаваемой точке плана (угол здания, угол бассейна), затем вставьте её координаты из Google Maps справа. Нужно минимум 3 точки, лучше 5–8 по всему комплексу.'
 };
 const tb = $('tools');
 TOOLS.forEach(t => { if (!t) { tb.appendChild(document.createElement('hr')); return; }
@@ -213,9 +240,11 @@ function hitMarker(p) { const r = R() * 1.3; let best = null, bd = r;
   const test = (x, y, key) => { const d = Math.hypot(p[0] - x, p[1] - y); if (d < bd) { bd = d; best = key; } };
   D.water.forEach((w, i) => test(w.x, w.y, 'water:' + i)); D.lifts.forEach((l, i) => test(l.x, l.y, 'lift:' + i));
   D.starts.forEach((s, i) => test(s.x, s.y, 'start:' + i)); for (const [id, q] of Object.entries(D.stairs)) test(q[0], q[1], 'stair:' + id);
+  D.points.forEach((q, i) => test(q.x, q.y, 'pt:' + i)); D.georef.forEach((q, i) => test(q.x, q.y, 'geo:' + i));
   return best; }
-function markerPos(key) { const [t, k] = key.split(/:(.*)/s); if (t === 'stair') return D.stairs[k]; const o = { water: D.water, lift: D.lifts, start: D.starts }[t][+k]; return o; }
-function moveMarker(key, p) { const [t, k] = key.split(/:(.*)/s); if (t === 'stair') { D.stairs[k] = [p[0], p[1]]; return; } const o = { water: D.water, lift: D.lifts, start: D.starts }[t][+k]; o.x = p[0]; o.y = p[1]; }
+const arrOf = t => ({ water: D.water, lift: D.lifts, start: D.starts, pt: D.points, geo: D.georef })[t];
+function markerPos(key) { const [t, k] = key.split(/:(.*)/s); if (t === 'stair') return D.stairs[k]; const a = arrOf(t); return a ? a[+k] : null; }
+function moveMarker(key, p) { const [t, k] = key.split(/:(.*)/s); if (t === 'stair') { D.stairs[k] = [p[0], p[1]]; return; } const o = arrOf(t)[+k]; o.x = p[0]; o.y = p[1]; }
 svg.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = toSvg(e.clientX, e.clientY); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, px, py); }, { passive: false });
 svg.addEventListener('pointerdown', e => {
   try { svg.setPointerCapture(e.pointerId); } catch (_) { /* синтетические события */ } ptrs.set(e.pointerId, [e.clientX, e.clientY]);
@@ -243,6 +272,7 @@ svg.addEventListener('pointermove', e => {
     return;
   }
   if (e.pointerType !== 'mouse') return;
+  if (tool === 'geo' || tab === 'geo') { const gf = geoFit(); if (gf) { const [la, lo] = gf.toLatLon(p[0], p[1]); $('hud').innerHTML = `${HINT[tool]}<br><span class="mono">курсор: ${la.toFixed(6)}, ${lo.toFixed(6)}</span>`; } }
   // подсветка под курсором
   let h = null;
   if (['move', 'draw', 'delete'].includes(tool)) { const n = nearNode(p, R()); if (n >= 0) h = { node: n }; }
@@ -289,8 +319,9 @@ function click(p) {
           const L = (r.d[sb] + dist(route.a, D.nodes[sa]) + dist(route.b, D.nodes[sb])) * MPP; toast(`Маршрут ≈ ${Math.round(L)} м`); $('hud').innerHTML = `${HINT.route}<br>Последний: <b>≈ ${Math.round(L)} м</b>`; } }
       renderRoute(); break;
     }
-    case 'lift': case 'water': case 'start': {
-      const m = hitMarker(p); if (m && m.startsWith(tool + ':')) { select(m); break; }
+    case 'lift': case 'water': case 'start': case 'elec': case 'info': case 'garage': case 'geo': {
+      const m = hitMarker(p);
+      if (m && (m.startsWith(tool + ':') || (m.startsWith('pt:') && D.points[+m.slice(3)].type === tool))) { select(m); break; }
       snap(); const key = create(tool, p); changed(); select(key); break;
     }
   }
@@ -302,9 +333,15 @@ function create(kind, p) {
     D.lifts.push({ id: 'L-' + st + (n ? '-' + (n + 1) : ''), block: st.split('-E')[0], stair_id: st, floors: '0-3', serves: '', note: '', x: p[0], y: p[1] }); return 'lift:' + (D.lifts.length - 1); }
   if (kind === 'water') { const s = Z.stacks[nearestStack(p)]; const b = s ? s.block : ''; const n = D.water.filter(w => w.block === b).length + 1;
     D.water.push({ id: `W-${b}-0-${n}`, block: b, floor: 0, place: 'galería', kind: 'contadores', serves: '', note: '', photo: '', x: p[0], y: p[1] }); return 'water:' + (D.water.length - 1); }
-  const n = D.starts.length + 1; D.starts.push({ id: 'start' + n, x: p[0], y: p[1], name: Object.fromEntries(LANGS.map(l => [l, 'Punto ' + n])) }); return 'start:' + (D.starts.length - 1);
+  if (kind === 'geo') { D.georef.push({ x: p[0], y: p[1], lat: null, lon: null, note: '' }); showTab('props'); return 'geo:' + (D.georef.length - 1); }
+  if (PT[kind]) { const s = Z.stacks[nearestStack(p)], b = s ? s.block : '';
+    const n = D.points.filter(q => q.type === kind).length + 1;
+    const o = { type: kind, id: { elec: `E-${b}-0-${n}`, info: `I-${n}`, garage: `G-${n}` }[kind], title: '', info: '', link: '', x: p[0], y: p[1] };
+    if (kind === 'elec') Object.assign(o, { block: b, floor: 0, place: 'galería', serves: '' });
+    D.points.push(o); return 'pt:' + (D.points.length - 1); }
+  const n = D.starts.length + 1; D.starts.push({ id: 'start' + n, kind: 'entrance', x: p[0], y: p[1], info: '', link: '', name: Object.fromEntries(LANGS.map(l => [l, 'Entrada ' + n])) }); return 'start:' + (D.starts.length - 1);
 }
-function removeMarker(key) { const [t, k] = key.split(/:(.*)/s); ({ water: D.water, lift: D.lifts, start: D.starts })[t].splice(+k, 1); if (sel && sel.key === key) sel = null; }
+function removeMarker(key) { const [t, k] = key.split(/:(.*)/s); arrOf(t).splice(+k, 1); if (sel && sel.key === key) sel = null; }
 function select(key) { sel = { key }; showTab('props'); renderMarks(); renderProps(); }
 
 document.addEventListener('keydown', e => {
@@ -322,11 +359,41 @@ $('vRaster').onchange = e => { G.raster.style.display = e.target.checked ? '' : 
 /* ================= боковая панель ================= */
 let tab = 'props';
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
-function showTab(t) { tab = t; document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); ['props', 'objs', 'check', 'pub'].forEach(k => $('p-' + k).hidden = k !== t); if (t === 'objs') renderObjs(); }
+function showTab(t) { tab = t; document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); ['props', 'objs', 'page', 'geo', 'check', 'pub'].forEach(k => $('p-' + k).hidden = k !== t);
+  if (t === 'objs') renderObjs(); if (t === 'page') renderPage(); if (t === 'geo') renderGeo(); }
+const LN = { es: 'Español', en: 'English', fr: 'Français', ru: 'Русский' };
+function renderPage() {
+  const p = $('p-page');
+  p.innerHTML = `<div class="note">Вкладка «Информация» в простом режиме навигатора. Пустой язык показывает текст на испанском, затем на английском.</div>
+    <div class="note">Разметка: <code># Заголовок</code>, <code>## Подзаголовок</code>, <code>- пункт списка</code>, <code>**жирный**</code>, <code>[текст](https://ссылка)</code>; адреса https://… становятся ссылками; пустая строка — новый абзац.</div>` +
+    LANGS.map(l => `<details${l === 'es' ? ' open' : ''}><summary class="lbl" style="cursor:pointer;padding:4px 0">${LN[l] || l} ${D.info[l] && D.info[l].text ? '✓' : ''}</summary>
+      ${field('Заголовок вкладки', `<input data-pl="${l}" data-pf="title" value="${esc(D.info[l] && D.info[l].title)}" placeholder="${l === 'ru' ? 'Информация' : 'Información'}">`)}
+      ${field('Текст', `<textarea data-pl="${l}" data-pf="text" style="min-height:220px">${esc(D.info[l] && D.info[l].text)}</textarea>`)}</details>`).join('');
+  let snapped = false;
+  p.querySelectorAll('[data-pl]').forEach(i => i.addEventListener('input', () => { if (!snapped) { snap(); snapped = true; }
+    const l = i.dataset.pl; D.info[l] = D.info[l] || { title: '', text: '' }; D.info[l][i.dataset.pf] = i.value; dirty = true;
+    clearTimeout(saveT); saveT = setTimeout(() => store.set(DRAFT, JSON.stringify({ t: Date.now(), d: toFile() })), 500); }));
+}
+function renderGeo() {
+  const gf = geoFit(), p = $('p-geo');
+  p.innerHTML = `<div class="note">Привязка нужна для кнопки «Где я» в навигаторе: телефон знает свои GPS-координаты, а привязка переводит их в точку на плане.</div>
+    <ol class="steps"><li>Выберите инструмент <b>Точка привязки</b> (P) и кликните по узнаваемому месту плана — углу корпуса, углу бассейна.</li>
+    <li>В Google Maps (спутник) правой кнопкой на то же место → скопируйте «широта, долгота» → вставьте справа.</li>
+    <li>Повторите для 5–8 точек по всему комплексу, не только с одной стороны.</li></ol>
+    <div class="lbl">Точки · ${D.georef.length}</div>` +
+    (D.georef.length ? `<div class="list">${D.georef.map((q, i) => { const r = gf && gf.idx[i] !== undefined ? gf.residuals[gf.idx[i]] : null;
+      return `<div data-key="geo:${i}"><b class="mono">${i + 1}</b><span>${typeof q.lat === 'number' ? q.lat.toFixed(5) + ', ' + q.lon.toFixed(5) : 'нет координат'}${q.note ? ' · ' + esc(q.note) : ''}</span><span class="${r !== null && r > 3 ? 'bad' : 'ok'}">${r !== null ? r.toFixed(1) + ' м' : ''}</span></div>`; }).join('')}</div>` : '<div class="note">пока нет</div>') +
+    `<div class="res">${gf ? `<div>Модель: ${gf.type === 'affine' ? 'аффинная' : 'подобие (2 точки)'}, средняя ошибка <b>${gf.rms.toFixed(2)} м</b>${gf.n < 4 ? ' — для честной оценки нужно 4+ точек' : ''}.</div>
+      <div class="note">Точка с ошибкой заметно больше остальных — скорее всего, координаты взяты не с того угла. Исправьте или удалите её.</div>` : '<div class="note">Нужно минимум 2 точки с координатами (лучше 5+).</div>'}</div>`;
+  p.querySelectorAll('[data-key]').forEach(d => d.onclick = () => { const o = markerPos(d.dataset.key); select(d.dataset.key); fitBox(o.x - 150, o.y - 110, o.x + 150, o.y + 110); });
+}
 const aptsOfStair = st => Z.units.filter(u => u.kind === 'apt' && Z.stacks[u.stack].stair === st);
 function field(label, html) { return `<div class="f"><label class="lbl">${label}</label>${html}</div>`; }
 const inp = (k, v, ph = '') => `<input data-k="${k}" value="${esc(v)}" placeholder="${esc(ph)}">`;
 const selc = (k, v, opts) => `<select data-k="${k}">${opts.map(o => `<option${String(o) === String(v) ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+const infoFields = o => `${field('Информация (текст в окне на карте)', `<textarea data-k="info" placeholder="Например: открыт 9–21, код калитки у консьержа">${esc(o.info)}</textarea>`)}
+      ${field('Ссылка (необязательно)', inp('link', o.link, 'https://…'))}`;
+const BLOCKS = [...new Set(Z.stacks.map(s => s.block))];
 function renderProps() {
   const p = $('p-props');
   if (!sel || !markerPos(sel.key)) {
@@ -366,14 +433,44 @@ function renderProps() {
       ${field('Квартиры', `<textarea data-k="serves" placeholder="449 443 437">${esc(o.serves)}</textarea>`)}
       <div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" type="button" id="fillStair">+ квартиры ближайшей лестницы на этом этаже</button><button class="btn" type="button" id="fillStack">+ квартиры ближайшего стояка</button></div>
       ${field('Примечание', inp('note', o.note))}
-      ${field('Фото (ссылка, необязательно)', inp('photo', o.photo, 'https://…'))}`;
+      ${field('Фото (ссылка, необязательно)', inp('photo', o.photo, 'https://…'))}
+      ${infoFields(o)}
+      <div class="note">Щиты показываются в навигаторе только в режиме Pro.</div>`;
+  } else if (t === 'pt' && o.type === 'elec') {
+    html = `<div class="lbl">Электрический щит</div>
+      ${field('Номер (id)', inp('id', o.id, 'E-15-0-1'))}
+      ${field('Название (необязательно)', inp('title', o.title, 'Cuadro general bloque 15'))}
+      <div class="row2">${field('Корпус', selc('block', o.block, BLOCKS))}${field('Этаж', selc('floor', o.floor, [0, 1, 2, 3]))}</div>
+      ${field('Где', selc('place', o.place, ['galería', 'portal', 'escalera', 'sótano', 'exterior']))}
+      ${field('Квартиры (необязательно)', `<textarea data-k="serves" placeholder="449 443 437">${esc(o.serves)}</textarea>`)}
+      <div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" type="button" id="fillStair">+ квартиры ближайшей лестницы на этом этаже</button><button class="btn" type="button" id="fillStack">+ квартиры ближайшего стояка</button></div>
+      ${infoFields(o)}
+      <div class="note">Виден в навигаторе только в режиме Pro.</div>`;
+  } else if (t === 'pt') {
+    html = `<div class="lbl">${o.type === 'garage' ? 'Въезд в гараж' : 'Информация (i)'}</div>
+      ${field('Номер (id)', inp('id', o.id))}
+      ${field('Заголовок окна', inp('title', o.title, o.type === 'garage' ? 'Garaje bloques 14–17' : 'Recepción'))}
+      ${infoFields(o)}`;
+  } else if (t === 'geo') {
+    const gf = geoFit(), i = +k, r = gf && gf.idx[i] !== undefined ? gf.residuals[gf.idx[i]] : null;
+    html = `<div class="lbl">Точка привязки ${i + 1}</div>
+      <div class="note mono">План: x ${o.x.toFixed(1)}, y ${o.y.toFixed(1)}</div>
+      ${field('Координаты (широта, долгота)', `<input data-geo="1" value="${typeof o.lat === 'number' ? o.lat.toFixed(7) + ', ' + o.lon.toFixed(7) : ''}" placeholder="38.0123456, -0.6789012">`)}
+      <div class="note" id="geoMsg">${r !== null ? `Отклонение этой точки: <b>${r.toFixed(2)} м</b>` : 'Вставьте координаты этой же точки с карты.'}</div>
+      ${field('Что это за точка', inp('note', o.note, 'угол корпуса 16, северо-запад'))}
+      <div class="note">Как взять координаты: в Google Maps (вид «Спутник») нажмите правой кнопкой на тот же угол здания — первая строка меню и есть «широта, долгота», клик копирует. На телефоне — долгое нажатие.</div>`;
   } else {
-    html = `<div class="lbl">Точка «Откуда»</div>${field('Код (id)', inp('id', o.id))}` + LANGS.map(l => field('Название · ' + l.toUpperCase(), `<input data-name="${l}" value="${esc(o.name[l])}">`)).join('');
+    html = `<div class="lbl">Вход / точка «Откуда»</div>${field('Код (id)', inp('id', o.id))}
+      ${field('Тип', `<select data-k="kind"><option value="entrance"${o.kind === 'entrance' ? ' selected' : ''}>Вход</option><option value="place"${o.kind !== 'entrance' ? ' selected' : ''}>Место (бассейн, офис…)</option></select>`)}` +
+      LANGS.map(l => field('Название · ' + l.toUpperCase(), `<input data-name="${l}" value="${esc(o.name[l])}">`)).join('') + infoFields(o);
   }
   p.innerHTML = html + `<div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="zoomSel" type="button">Показать на плане</button><button class="btn danger" id="delSel" type="button">Удалить</button></div>`;
   let snapped = false; const once = () => { if (!snapped) { snap(); snapped = true; } };
   p.querySelectorAll('[data-k]').forEach(i => i.addEventListener('input', () => { once(); o[i.dataset.k] = i.dataset.k === 'floor' ? +i.value : i.value; dirty = true; setStats(); clearTimeout(saveT); saveT = setTimeout(() => store.set(DRAFT, JSON.stringify({ t: Date.now(), d: toFile() })), 500); if (i.tagName === 'SELECT') renderProps(); }));
   p.querySelectorAll('[data-name]').forEach(i => i.addEventListener('input', () => { once(); o.name[i.dataset.name] = i.value; dirty = true; }));
+  p.querySelectorAll('[data-geo]').forEach(i => i.addEventListener('change', () => { const v = window.FDPGeo && FDPGeo.parse(i.value);
+    if (!v && i.value.trim()) { $('geoMsg').innerHTML = '<span class="bad">Не понял координаты. Формат: 38.0123, -0.6789</span>'; return; }
+    once(); o.lat = v ? v[0] : null; o.lon = v ? v[1] : null; changed(); if (tab === 'geo') renderGeo(); }));
   const add = list => { once(); const cur = new Set(String(o.serves || '').split(/[\s,;]+/).filter(Boolean)); list.forEach(n => cur.add(String(n))); o.serves = [...cur].sort((a, b) => a - b).join(' '); changed(); };
   if ($('fillStair')) $('fillStair').onclick = () => { const st = nearestStair([o.x, o.y]); add(aptsOfStair(st).filter(u => u.floor === +o.floor).map(u => u.num)); };
   if ($('fillStack')) $('fillStack').onclick = () => { const si = nearestStack([o.x, o.y]); add(Z.units.filter(u => u.kind === 'apt' && u.stack === si).map(u => u.num)); };
@@ -381,11 +478,16 @@ function renderProps() {
   $('zoomSel').onclick = () => fitBox(o.x - 150, o.y - 110, o.x + 150, o.y + 110);
 }
 function renderObjs() {
+  const ptSec = (title, type, sub) => { const items = D.points.map((o, i) => [o, i]).filter(([o]) => o.type === type);
+    return `<div class="lbl">${title} · ${items.length}</div>` + (items.length ? `<div class="list">${items.map(([o, i]) =>
+      `<div data-key="pt:${i}" class="${sel && sel.key === 'pt:' + i ? 'on' : ''}"><b class="mono">${esc(o.id)}</b><span>${esc(sub(o))}${o.info ? ' · ✎' : ''}</span></div>`).join('')}</div>` : '<div class="note">пока нет</div>'); };
   const sec = (title, arr, type, sub) => `<div class="lbl">${title} · ${arr.length}</div>` + (arr.length ? `<div class="list">${arr.map((o, i) =>
     `<div data-key="${type}:${i}" class="${sel && sel.key === type + ':' + i ? 'on' : ''}"><b class="mono">${esc(o.id)}</b><span>${esc(sub(o))}</span></div>`).join('')}</div>` : '<div class="note">пока нет</div>');
   $('p-objs').innerHTML = sec('Лифты', D.lifts, 'lift', o => `${o.stair_id}${o.note ? ' · ' + o.note : ''}`) +
     sec('Щиты воды', D.water, 'water', o => `корп. ${o.block}, эт. ${o.floor}, ${String(o.serves || '').split(/[\s,;]+/).filter(Boolean).length} кв.`) +
-    sec('Точки «Откуда»', D.starts, 'start', o => o.name.ru || o.name.es || '');
+    sec('Входы и точки «Откуда»', D.starts, 'start', o => (o.kind === 'entrance' ? 'вход · ' : '') + (o.name.ru || o.name.es || '')) +
+    ptSec('Информация (i)', 'info', o => o.title || '') + ptSec('Въезды в гараж', 'garage', o => o.title || '') +
+    ptSec('Электрические щиты', 'elec', o => `корп. ${o.block}, эт. ${o.floor}`);
   $('p-objs').querySelectorAll('[data-key]').forEach(d => d.onclick = () => { const o = markerPos(d.dataset.key); select(d.dataset.key); fitBox(o.x - 150, o.y - 110, o.x + 150, o.y + 110); });
 }
 
@@ -410,7 +512,8 @@ $('runCheck').onclick = () => {
   }
   for (const [id, q] of Object.entries(D.stairs)) { const n = near(q); const d = dist(q, D.nodes[n]) * MPP; if (d > 6) { bad++; } if (d > 6) out.push(`<div class="bad">Лестница ${id}: до ближайшей дорожки ${Math.round(d)} м — дорисуйте подход.</div>`); }
   const unknown = D.lifts.filter(l => !D.stairs[l.stair_id]); if (unknown.length) bad++; if (unknown.length) out.push(`<div class="bad">Лифты с неизвестной лестницей: ${unknown.map(l => l.id).join(', ')}</div>`);
-  const ids = [...D.lifts, ...D.water].map(o => o.id), dup = ids.filter((v, i) => ids.indexOf(v) !== i); if (dup.length) bad++; if (dup.length) out.push(`<div class="bad">Повторяющиеся номера: ${[...new Set(dup)].join(', ')}</div>`);
+  const ids = [...D.lifts, ...D.water, ...D.points].map(o => o.id), dup = ids.filter((v, i) => ids.indexOf(v) !== i); if (dup.length) bad++; if (dup.length) out.push(`<div class="bad">Повторяющиеся номера: ${[...new Set(dup)].join(', ')}</div>`);
+  const gf = geoFit(); out.push(gf ? `<div>${gf.rms < 3 ? '<span class="ok">✓</span>' : '<span class="bad">!</span>'} Привязка к местности: ${gf.n} точек, средняя ошибка ${gf.rms.toFixed(1)} м${gf.n < 4 ? ' (для оценки ошибки нужно ≥ 4 точек)' : ''}</div>` : '<div class="note">Привязки к местности нет — кнопка «Где я» в навигаторе не появится.</div>');
   out.push(`<div class="note">${bad || nc > 1 ? 'Исправьте отмеченное и проверьте снова.' : 'Можно публиковать.'}</div>`);
   $('checkRes').innerHTML = out.join('');
 };

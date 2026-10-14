@@ -20,6 +20,7 @@ if (EDITS && EDITS.format === 'flamenca-edits' && EDITS.graph) {
   if (Array.isArray(EDITS.starts) && EDITS.starts.length) Z.starts = EDITS.starts.map(s => ({ ...s }));
   Z.starts.forEach(s => { s.node = near(s.x, s.y); });
   Z.lifts = EDITS.lifts || []; Z.water = EDITS.water || [];
+  Z.points = EDITS.points || []; Z.info = EDITS.info || null; Z.georef = (EDITS.georef && EDITS.georef.points) || [];
 }
 if (PREVIEW) {
   const b = document.createElement('div'); b.className = 'previewbar';
@@ -130,6 +131,25 @@ const I18N = {
     foot: 'Сводный план собран из четырёх листов мастер-плана; расстояния приблизительные (~0,1 м на пиксель). Этаж берётся из кода: A3a-449 → 3-й этаж.'
   }
 };
+const I18N_X = {
+  es: { tabRoute: 'Ruta', tabInfo: 'Información', infoEmpty: 'Aún no hay información.', openLink: 'Abrir enlace', close: 'Cerrar', apts: 'Apartamentos',
+    locate: 'Dónde estoy', locating: 'Buscando su ubicación…', geoDenied: 'Sin acceso a la ubicación. Permítalo en los ajustes del navegador.', geoFar: 'Parece que está fuera del residencial.', geoNone: 'La ubicación no está disponible.', myLocation: 'Mi ubicación', accuracy: a => `precisión ±${a} m`,
+    type: { entrance: 'Entrada', place: 'Punto de salida', info: 'Información', elec: 'Cuadro eléctrico', water: 'Cuadro de agua', garage: 'Entrada al garaje', facility: 'Servicio' },
+    lyx: { places: 'Entradas, información, garajes', panels: 'Cuadros eléctricos y de agua' } },
+  en: { tabRoute: 'Route', tabInfo: 'Information', infoEmpty: 'No information yet.', openLink: 'Open link', close: 'Close', apts: 'Apartments',
+    locate: 'Where am I', locating: 'Finding your location…', geoDenied: 'No access to location. Allow it in the browser settings.', geoFar: 'You seem to be outside the residence.', geoNone: 'Location is not available.', myLocation: 'My location', accuracy: a => `accuracy ±${a} m`,
+    type: { entrance: 'Entrance', place: 'Starting point', info: 'Information', elec: 'Electrical panel', water: 'Water panel', garage: 'Garage entrance', facility: 'Facility' },
+    lyx: { places: 'Entrances, information, garages', panels: 'Electrical and water panels' } },
+  fr: { tabRoute: 'Itinéraire', tabInfo: 'Informations', infoEmpty: 'Pas encore d’informations.', openLink: 'Ouvrir le lien', close: 'Fermer', apts: 'Appartements',
+    locate: 'Où suis-je', locating: 'Recherche de votre position…', geoDenied: 'Pas d’accès à la position. Autorisez-la dans les réglages du navigateur.', geoFar: 'Vous semblez être hors de la résidence.', geoNone: 'Position indisponible.', myLocation: 'Ma position', accuracy: a => `précision ±${a} m`,
+    type: { entrance: 'Entrée', place: 'Point de départ', info: 'Informations', elec: 'Tableau électrique', water: 'Tableau d’eau', garage: 'Entrée du garage', facility: 'Équipement' },
+    lyx: { places: 'Entrées, informations, garages', panels: 'Tableaux électriques et d’eau' } },
+  ru: { tabRoute: 'Маршрут', tabInfo: 'Информация', infoEmpty: 'Информации пока нет.', openLink: 'Открыть ссылку', close: 'Закрыть', apts: 'Квартиры',
+    locate: 'Где я', locating: 'Определяем местоположение…', geoDenied: 'Нет доступа к местоположению. Разрешите его в настройках браузера.', geoFar: 'Похоже, вы не на территории комплекса.', geoNone: 'Местоположение недоступно.', myLocation: 'Моё местоположение', accuracy: a => `точность ±${a} м`,
+    type: { entrance: 'Вход', place: 'Точка старта', info: 'Информация', elec: 'Электрический щит', water: 'Щит воды', garage: 'Въезд в гараж', facility: 'Объект' },
+    lyx: { places: 'Входы, информация, гаражи', panels: 'Электрические и водяные щиты' } }
+};
+for (const l in I18N_X) { const x = I18N_X[l]; Object.assign(I18N[l].ly, x.lyx); delete x.lyx; Object.assign(I18N[l], x); }
 const LANGS = Object.keys(I18N);
 const store = {
   get(k) { try { return localStorage.getItem('fdp.' + k); } catch (_) { return null; } },
@@ -148,7 +168,11 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 /* ================= данные ================= */
 const [W, H] = Z.size, M_PER_PX = Z.metersPerPx, WALK = CFG.walkSpeed;
-const STACKS = Z.stacks, STAIRS = Z.stairs, UNITS = Z.units, LIFTS = Z.lifts || [], WATER = Z.water || [];
+const STACKS = Z.stacks, STAIRS = Z.stairs, UNITS = Z.units, LIFTS = Z.lifts || [], WATER = Z.water || [], POINTS = Z.points || [];
+const ELEC = POINTS.filter(p => p.type === 'elec');
+const ENTRANCES = new Set(['jalon', 'picasso', 'south', 'north']);
+Z.starts.forEach(s => { if (!s.kind) s.kind = ENTRANCES.has(s.id) ? 'entrance' : 'place'; });
+const GEO = window.FDPGeo ? FDPGeo.fit(Z.georef || [], Z.metersPerPx) : null;
 const STAIR = Object.fromEntries(STAIRS.map(s => [s.id, s]));
 const NODES = Z.graph.nodes;
 const ADJ = NODES.map(() => []);
@@ -179,6 +203,7 @@ const stairOf = u => STAIR[STACKS[u.stack].stair];
 const servesList = v => String(v || '').split(/[\s,;]+/).filter(Boolean);
 const liftOf = u => { const sid = STACKS[u.stack].stair;
   return LIFTS.find(l => servesList(l.serves).includes(String(u.num))) || LIFTS.find(l => l.stair_id === sid && !servesList(l.serves).length) || null; };
+const elecOf = u => ELEC.find(w => servesList(w.serves).includes(String(u.num))) || null;
 const waterOf = u => WATER.find(w => servesList(w.serves).includes(String(u.num)) || servesList(w.serves).includes(u.code)) || null;
 
 /* ================= план (SVG) ================= */
@@ -224,17 +249,27 @@ for (const l of LIFTS) { const g = el('g', {}, L('liftsdata'));
   el('rect', { x: l.x - 9, y: l.y - 10, width: 18, height: 20, rx: 3, fill: '#1f4fd1', stroke: '#fff', 'stroke-width': 2.5 }, g);
   el('text', { x: l.x, y: l.y + 4.5, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, g).textContent = 'L';
   el('title', {}, g).textContent = `${l.id}${l.note ? ' · ' + l.note : ''}`; }
-for (const w of WATER) { const g = el('g', {}, L('water'));
-  el('circle', { cx: w.x, cy: w.y, r: 10, fill: '#2e95c2', stroke: '#fff', 'stroke-width': 2.5 }, g);
-  el('text', { x: w.x, y: w.y + 4, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, g).textContent = 'W';
-  el('title', {}, g).textContent = `${w.id} · ${w.floor ?? ''} · ${w.place || ''}`; }
-const startEls = {};
-for (const s of Z.starts) { const g = el('g', {}, $('g-starts'));
-  el('rect', { x: s.x - 9, y: s.y - 9, width: 18, height: 18, rx: 3, fill: '#fff', stroke: '#1d2420', 'stroke-width': 2.5 }, g); startEls[s.id] = el('title', {}, g); }
+/* объекты с окном информации: входы, точки старта, «i», гаражи (все режимы) и щиты (только Pro) */
+const OBJS = [
+  ...Z.starts.map(s => ({ kind: s.kind, o: s })),
+  ...POINTS.filter(p => p.type === 'info' || p.type === 'garage').map(p => ({ kind: p.type, o: p })),
+  ...ELEC.map(p => ({ kind: 'elec', o: p, pro: true })),
+  ...WATER.map(p => ({ kind: 'water', o: p, pro: true }))
+];
+const ICONS = {
+  entrance: g => { el('rect', { x: -12, y: -12, width: 24, height: 24, rx: 6, fill: '#1d2420', stroke: '#fff', 'stroke-width': 2.5 }, g); el('path', { d: 'M-6 0h10M0-5l5 5-5 5', stroke: '#fff', 'stroke-width': 2.4, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g); },
+  place: g => { el('rect', { x: -9, y: -9, width: 18, height: 18, rx: 4, fill: '#fff', stroke: '#1d2420', 'stroke-width': 2.5 }, g); },
+  info: g => { el('circle', { r: 12, fill: '#6d4bd1', stroke: '#fff', 'stroke-width': 2.5 }, g); el('path', { d: 'M0-1v7M0-6v.5', stroke: '#fff', 'stroke-width': 3, 'stroke-linecap': 'round' }, g); },
+  garage: g => { el('rect', { x: -12, y: -12, width: 24, height: 24, rx: 6, fill: '#4a5560', stroke: '#fff', 'stroke-width': 2.5 }, g); el('text', { y: 5.5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: '#fff', 'font-family': 'IBM Plex Sans,sans-serif' }, g).textContent = 'P'; },
+  elec: g => { el('rect', { x: -11, y: -11, width: 22, height: 22, rx: 5, fill: '#d99a00', stroke: '#fff', 'stroke-width': 2.5 }, g); el('path', { d: 'M1.5-7L-4.5 1.5h4.5l-1.5 6 6-8.5h-4.5z', fill: '#fff' }, g); },
+  water: g => { el('circle', { r: 11, fill: '#2e95c2', stroke: '#fff', 'stroke-width': 2.5 }, g); el('path', { d: 'M0-6.5s4.5 5 4.5 7.8a4.5 4.5 0 01-9 0c0-2.8 4.5-7.8 4.5-7.8z', fill: '#fff' }, g); }
+};
+for (const it of OBJS) { const g = el('g', { transform: `translate(${it.o.x} ${it.o.y})` }, L(it.pro ? 'panels' : 'places')); const m = el('g', { class: 'mk' }, g); ICONS[it.kind](m); }
 
 /* ================= состояние ================= */
 const MODES = ['simple', 'pro'];
 const state = {
+  locked: MODES.includes(params.get('mode')) && params.has('lock'), geo: null,
   mode: MODES.includes(params.get('mode')) ? params.get('mode') : (MODES.includes(store.get('mode')) ? store.get('mode') : 'simple'),
   apt: null, from: Z.starts[0].id, customStart: null, picking: false, floor: 'all', show: 'all', hover: -1
 };
@@ -268,8 +303,8 @@ function renderStacks() {
 }
 
 /* ================= маршрут и карточка ================= */
-const startPoint = () => state.from === '__custom' ? { x: state.customStart[0], y: state.customStart[1], node: nearestNode(...state.customStart) } : Z.starts.find(s => s.id === state.from);
-const startName = () => state.from === '__custom' ? T('pointOnMap') : tr(Z.starts.find(s => s.id === state.from).name);
+const startPoint = () => (state.from === '__custom' || state.from === '__geo') ? { x: state.customStart[0], y: state.customStart[1], node: nearestNode(...state.customStart) } : Z.starts.find(s => s.id === state.from);
+const startName = () => state.from === '__geo' ? T('myLocation') : state.from === '__custom' ? T('pointOnMap') : tr(Z.starts.find(s => s.id === state.from).name);
 let lastPts = null;
 
 function render() {
@@ -289,7 +324,7 @@ function render() {
   const boxes = (simple() ? s.near : [a.stack]).map(i => STACKS[i].box);
   lastPts = pts.concat(...boxes.map(b => [[b[0], b[1]], [b[2], b[3]]]));
   const meters = Math.round(len * M_PER_PX), mins = Math.max(1, Math.round(meters / WALK / 60)), n = st.n;
-  const lf = liftOf(a), wp = waterOf(a);
+  const lf = liftOf(a), wp = simple() ? null : waterOf(a), ep = simple() ? null : elecOf(a);
   const liftBig = a.floor === 0 ? '—' : (lf ? lf.id.replace(/^L-?/, '') : n);
   const liftSmall = a.floor === 0 ? T('noLift') : (lf ? (lf.note || lf.id) : T('liftNear')(n));
   const liftStar = lf ? '' : '*';
@@ -312,7 +347,7 @@ function render() {
   const steps = [T('start')(startName()), T('alongPaths')(meters), T('entrance')(st.group, n), a.floor === 0 ? T('levelEntry') : T('goUp')(a.floor), T('door')(a.code)];
   info.innerHTML = `<div class="dest">${esc(a.kind === 'apt' ? a.num + ' · ' + a.code : a.code)}</div>
     <div class="stat"><div><b>≈${meters} ${T('m')}</b><span>${esc(T('walk'))}</span></div><div><b>${esc(T('minutes')(mins))}</b><span>${esc(T('onSite'))}</span></div><div><b>${a.floor}</b><span>${esc(T('floor'))}</span></div></div>
-    <dl class="kv"><dt>${esc(T('block'))}</dt><dd>${esc(s.block)}</dd><dt>${esc(T('staircase'))}</dt><dd>Escalera ${n}</dd><dt>${esc(T('lift'))}</dt><dd>${esc(lf && a.floor ? lf.id : liftSmall)}${liftStar}</dd>${wp ? `<dt>${esc(T('water'))}</dt><dd>${esc(wp.id)}${wp.place ? ' · ' + esc(wp.place) : ''}</dd>` : ''}</dl>
+    <dl class="kv"><dt>${esc(T('block'))}</dt><dd>${esc(s.block)}</dd><dt>${esc(T('staircase'))}</dt><dd>Escalera ${n}</dd><dt>${esc(T('lift'))}</dt><dd>${esc(lf && a.floor ? lf.id : liftSmall)}${liftStar}</dd>${wp ? `<dt>${esc(T('water'))}</dt><dd>${esc(wp.id)}${wp.place ? ' · ' + esc(wp.place) : ''}</dd>` : ''}${ep ? `<dt>${esc(T('type').elec)}</dt><dd>${esc(ep.id)}${ep.place ? ' · ' + esc(ep.place) : ''}</dd>` : ''}</dl>
     <ol class="steps">${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
     ${lf ? '' : `<p class="note">${esc(T('liftNote'))}</p>`}
     <button class="btn" id="fitroute" type="button">${esc(T('showRoute'))}</button>`;
@@ -350,9 +385,10 @@ function fillFrom() {
   fromSel.innerHTML = '';
   Z.starts.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = tr(s.name); fromSel.appendChild(o); });
   const oc = document.createElement('option'); oc.value = '__custom'; oc.textContent = T('pointOnMap'); oc.hidden = state.from !== '__custom'; fromSel.appendChild(oc);
+  if (state.geo) { const og = document.createElement('option'); og.value = '__geo'; og.textContent = '◎ ' + T('myLocation'); fromSel.insertBefore(og, fromSel.firstChild); }
   fromSel.value = state.from;
 }
-fromSel.addEventListener('change', () => { state.from = fromSel.value; if (state.from !== '__custom') state.customStart = null; render(); if (state.apt && lastPts) fitTo(lastPts); });
+fromSel.addEventListener('change', () => { state.from = fromSel.value; if (state.from === '__geo') state.customStart = state.geo.px; else if (state.from !== '__custom') state.customStart = null; render(); if (state.apt && lastPts) fitTo(lastPts); });
 
 function seg(id, items, key, cb) {
   const box = $(id); box.innerHTML = '';
@@ -368,7 +404,7 @@ function buildSegs() {
 }
 const syncMode = seg('modeseg', [['simple', 'Simple'], ['pro', 'Pro']], 'mode', () => setMode(state.mode));
 function setMode(m) {
-  state.mode = m; store.set('mode', m); syncMode();
+  state.mode = m; if (!state.locked) store.set('mode', m); syncMode();
   document.body.classList.toggle('mode-simple', m === 'simple'); document.body.classList.toggle('mode-pro', m === 'pro');
   if (state.picking) $('pick').click();
   applyLayers(); render();
@@ -385,7 +421,8 @@ function setLang(l) {
   $('footnote').textContent = T('foot');
   poiTitles.forEach(([e, c]) => { e.textContent = `${c} — ${tr(Z.legend[c] || '')}`; });
   badgeTitles.forEach(([e, t]) => { e.textContent = T('bld')(t); });
-  Z.starts.forEach(s => { startEls[s.id].textContent = tr(s.name); });
+  renderInfoPage(); $('stabs').querySelectorAll('button').forEach(b => { b.textContent = T(b.dataset.v === 'info' ? 'tabInfo' : 'tabRoute'); });
+  $('locate').setAttribute('aria-label', T('locate')); $('locate').title = T('locate'); $('useloc').textContent = '◎ ' + T('locate');
   STAIRS.forEach(s => { escEls[s.id][1].textContent = `Escalera ${s.n} · ${T('bld')(s.group)}`; liftEls[s.id][1].textContent = `${T('lift')} ${s.n}* · ${T('bld')(s.group)}`; });
   stackEls.forEach((e, i) => { e.innerHTML = ''; el('title', {}, e).textContent = `${T('bld')(STACKS[i].block)}: ${UNITS.filter(u => u.stack === i).map(label).join(', ')}`; });
   fillFrom(); buildSegs(); buildLayers(); render();
@@ -410,15 +447,15 @@ q.addEventListener('blur', () => setTimeout(() => sugg.hidden = true, 150));
 $('pick').onclick = () => { state.picking = !state.picking; $('pick').classList.toggle('on', state.picking); svg.classList.toggle('picking', state.picking); $('hint').hidden = !state.picking; };
 
 /* ================= слои ================= */
-const LAYER_DEF = [['apts', 'aptlabels', 'plain', 'esc', LIFTS.length ? 'liftsdata' : 'lifts', ...(WATER.length ? ['water'] : [])], ['bld', 'gallery', 'badges'], ['pois', 'pool', 'lawn', 'walk', 'road', 'parking'], ['graph', 'raster']];
-const SW = { water: '#2e95c2', liftsdata: '#1f4fd1', apts: '#eef6ef', plain: '#fbf2e2', esc: '#2f7a4d', lifts: '#1f4fd1', bld: '#e7e1d3', gallery: '#efd57c', badges: '#2b2f2c', walk: '#e9dcbd', road: '#d3d6d3', parking: '#848985', lawn: '#bcd592', pool: '#57c1ea', graph: '#1f4fd1' };
+const LAYER_DEF = [['apts', 'aptlabels', 'plain', 'esc', LIFTS.length ? 'liftsdata' : 'lifts'], ['bld', 'gallery', 'badges'], ['places', ...((WATER.length || ELEC.length) ? ['panels'] : []), 'pois', 'pool', 'lawn', 'walk', 'road', 'parking'], ['graph', 'raster']];
+const SW = { places: '#6d4bd1', panels: '#d99a00', water: '#2e95c2', liftsdata: '#1f4fd1', apts: '#eef6ef', plain: '#fbf2e2', esc: '#2f7a4d', lifts: '#1f4fd1', bld: '#e7e1d3', gallery: '#efd57c', badges: '#2b2f2c', walk: '#e9dcbd', road: '#d3d6d3', parking: '#848985', lawn: '#bcd592', pool: '#57c1ea', graph: '#1f4fd1' };
 const PRESETS = [
   ['apts', 'aptlabels', 'plain', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'pois', 'pool', 'lawn', 'walk', 'road', 'parking'],
   ['apts', 'aptlabels', 'esc', 'lifts', 'bld', 'badges', 'walk', 'road'],
   ['apts', 'aptlabels', 'plain', 'esc', 'badges'],
   ['apts', 'esc', 'raster', 'graph']];
-const SIMPLE_LAYERS = new Set(['liftsdata', 'apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
-PRESETS[0].push('liftsdata', 'water'); PRESETS[1].push('liftsdata');
+const SIMPLE_LAYERS = new Set(['places', 'liftsdata', 'apts', 'aptlabels', 'esc', 'lifts', 'bld', 'gallery', 'badges', 'walk', 'road', 'parking', 'lawn', 'pool', 'pois']);
+PRESETS[0].push('liftsdata', 'places', 'panels'); PRESETS[1].push('liftsdata', 'places'); PRESETS[2].push('places');
 const on = new Set(PRESETS[0]);
 const boxes = {};
 function buildLayers() {
@@ -451,7 +488,7 @@ if (isPhone()) $('layerbtn').click();
 
 /* ================= зум, панорама, клики ================= */
 let vb = [...FULL];
-const setVB = () => svg.setAttribute('viewBox', vb.join(' '));
+const setVB = () => { svg.setAttribute('viewBox', vb.join(' ')); const r = svg.getBoundingClientRect(); const s = Math.max(vb[2] / (r.width || 1), vb[3] / (r.height || 1)); svg.style.setProperty('--ms', Math.max(.6, Math.min(8, s * 1.05)).toFixed(3)); };
 function toSvg(cx, cy) { const r = svg.getBoundingClientRect(); const s = Math.max(vb[2] / r.width, vb[3] / r.height);
   const ox = (r.width * s - vb[2]) / 2, oy = (r.height * s - vb[3]) / 2; return [vb[0] - ox + (cx - r.left) * s, vb[1] - oy + (cy - r.top) * s]; }
 function zoomAt(f, px, py) { const nw = Math.min(W * 1.6, Math.max(200, vb[2] * f)), k = nw / vb[2]; vb = [px - (px - vb[0]) * k, py - (py - vb[1]) * k, nw, vb[3] * k]; setVB(); }
@@ -492,11 +529,107 @@ const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if 
 svg.addEventListener('pointerup', e => { const wasClick = moved < 8 && ptrs.size === 1; up(e); if (!wasClick) return;
   const [x, y] = toSvg(e.clientX, e.clientY);
   if (state.picking) { state.customStart = [x, y]; state.from = '__custom'; fillFrom(); $('pick').click(); render(); return; }
+  const hit = objAt(x, y); if (hit) { openPop(hit); return; }
   const i = stackAt(x, y); if (i >= 0) openStack(i); });
 svg.addEventListener('pointercancel', up);
 $('zin').onclick = () => zoomAt(1 / 1.4, vb[0] + vb[2] / 2, vb[1] + vb[3] / 2);
 $('zout').onclick = () => zoomAt(1.4, vb[0] + vb[2] / 2, vb[1] + vb[3] / 2);
 $('zfit').onclick = () => { vb = [...FULL]; setVB(); };
+
+/* ================= окно объекта ================= */
+function objAt(x, y) {
+  const r = svg.getBoundingClientRect(), k = Math.max(vb[2] / r.width, vb[3] / r.height), R = 18 * k;
+  const act = simple() ? SIMPLE_LAYERS : on; let best = null, bd = R;
+  for (const it of OBJS) { if (it.pro && (simple() || !act.has('panels'))) continue; if (!it.pro && !act.has('places')) continue;
+    const d = Math.hypot(it.o.x - x, it.o.y - y); if (d < bd) { bd = d; best = it; } }
+  if (!best && act.has('pois')) for (const q of Z.pois) { const d = Math.hypot(q.x - x, q.y - y); if (d < bd) { bd = d; best = { kind: 'facility', o: q }; } }
+  return best;
+}
+const linkify = t => esc(t).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, a, u) => `<a href="${u}" target="_blank" rel="noopener">${a}</a>`)
+  .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, p, u) => `${p}<a href="${u}" target="_blank" rel="noopener">${u}</a>`)
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+const safeUrl = u => { u = String(u || '').trim(); if (!u) return ''; if (!/^https?:\/\//i.test(u)) u = 'https://' + u.replace(/^\/+/, ''); try { return new URL(u).href; } catch (_) { return ''; } };
+function openPop(it) {
+  const o = it.o, ty = T('type');
+  let title, sub = ty[it.kind] || '', extra = '';
+  if (it.kind === 'entrance' || it.kind === 'place') title = tr(o.name);
+  else if (it.kind === 'facility') { title = tr(Z.legend[o.code] || '') || o.code; sub = `${ty.facility} · ${o.code}`; }
+  else title = o.title || o.id || sub;
+  if (it.kind === 'elec' || it.kind === 'water') {
+    const bits = [o.id, o.block ? T('bld')(o.block) : '', o.floor !== undefined && o.floor !== '' ? T('floorN')(+o.floor) : '', o.place || '', it.kind === 'water' && o.kind ? o.kind : ''].filter(Boolean);
+    if (title === o.id) title = ty[it.kind];
+    sub = bits.join(' · ');
+    const sv = servesList(o.serves); if (sv.length) extra += `<p class="pmeta"><b>${esc(T('apts'))}:</b> ${esc(sv.join(', '))}</p>`;
+    if (o.note) extra += `<p class="pmeta">${esc(o.note)}</p>`;
+    const ph = safeUrl(o.photo); if (ph) extra += `<p><a href="${esc(ph)}" target="_blank" rel="noopener">📷</a></p>`;
+  }
+  const text = o.info ? `<div class="ptext">${linkify(o.info).replace(/\n/g, '<br>')}</div>` : '';
+  const link = safeUrl(o.link);
+  $('popb').innerHTML = `<div class="pkind pk-${it.kind}">${esc(sub)}</div><h3 id="poptitle">${esc(title)}</h3>${text}${extra}${link ? `<a class="btn primary plink" href="${esc(link)}" target="_blank" rel="noopener">${esc(T('openLink'))} ↗</a>` : ''}`;
+  $('pop').hidden = false; $('popx').focus();
+}
+const closePop = () => { $('pop').hidden = true; };
+$('popx').onclick = closePop;
+$('pop').addEventListener('click', e => { if (e.target === $('pop')) closePop(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('pop').hidden) closePop(); });
+
+/* ================= вкладка «Информация» (Simple) ================= */
+function md(src) {
+  const out = []; let list = false, para = [];
+  const flush = () => { if (para.length) { out.push(`<p>${para.map(linkify).join('<br>')}</p>`); para = []; } if (list) { out.push('</ul>'); list = false; } };
+  for (const raw of String(src || '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { flush(); continue; }
+    let m;
+    if ((m = line.match(/^(#{1,3})\s+(.*)/))) { flush(); out.push(`<h${m[1].length + 1}>${linkify(m[2])}</h${m[1].length + 1}>`); continue; }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)/))) { if (para.length) { out.push(`<p>${para.map(linkify).join('<br>')}</p>`); para = []; } if (!list) { out.push('<ul>'); list = true; } out.push(`<li>${linkify(m[1])}</li>`); continue; }
+    if (list) { out.push('</ul>'); list = false; }
+    para.push(line);
+  }
+  flush(); return out.join('');
+}
+const INFO = Z.info || {};
+const infoOf = () => { for (const l of [LANG, 'es', 'en', ...LANGS]) { const x = INFO[l]; if (x && (x.text || '').trim()) return x; } return null; };
+function renderInfoPage() {
+  const x = infoOf(); $('stabs').hidden = !x;
+  if (!x && state.tab === 'info') setTab('route');
+  $('infopage').innerHTML = x ? (x.title ? `<h2>${esc(x.title)}</h2>` : '') + md(x.text) : `<p class="note">${esc(T('infoEmpty'))}</p>`;
+  const b = $('stabs').querySelector('[data-v="info"]'); if (b && x && x.title) b.textContent = x.title;
+}
+function setTab(t) { state.tab = t; document.body.classList.toggle('tab-info', t === 'info'); $('stabs').querySelectorAll('button').forEach(b => { const on = b.dataset.v === t; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); }
+$('stabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
+state.tab = 'route';
+
+/* ================= «Где я» ================= */
+let watchId = null, firstFix = true;
+const toast = t => { const e = $('ntoast'); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { e.hidden = true; }, 3500); };
+function drawMe() {
+  const g = $('g-me'); g.innerHTML = ''; if (!state.geo) return;
+  const [x, y] = state.geo.px;
+  el('circle', { cx: x, cy: y, r: Math.max(20, state.geo.acc / M_PER_PX), fill: '#1f4fd1', 'fill-opacity': .12, stroke: '#1f4fd1', 'stroke-opacity': .4, 'stroke-width': 2 }, g);
+  const m = el('g', { transform: `translate(${x} ${y})` }, g); const k = el('g', { class: 'mk' }, m);
+  el('circle', { r: 9, fill: '#1f4fd1', stroke: '#fff', 'stroke-width': 3.5 }, k);
+}
+function locate() {
+  if (!GEO) return;
+  if (!navigator.geolocation) { toast(T('geoNone')); return; }
+  if (watchId !== null) { if (state.geo) { useGeo(); fitTo([state.geo.px, ...(lastPts || [])]); } return; }
+  toast(T('locating')); $('locate').classList.add('on');
+  watchId = navigator.geolocation.watchPosition(pos => {
+    const px = GEO.toPx(pos.coords.latitude, pos.coords.longitude), acc = Math.round(pos.coords.accuracy || 0);
+    const inside = px[0] > -300 && px[1] > -300 && px[0] < W + 300 && px[1] < H + 300;
+    if (!inside) { if (firstFix) toast(T('geoFar')); firstFix = false; state.geo = null; drawMe(); return; }
+    const moved = !state.geo || Math.hypot(state.geo.px[0] - px[0], state.geo.px[1] - px[1]) * M_PER_PX > 3;
+    state.geo = { px, acc }; drawMe();
+    if (firstFix) { firstFix = false; toast(`${T('myLocation')} · ${T('accuracy')(acc)}`); useGeo(); if (!state.apt) fitTo([[px[0] - 300, px[1] - 300], [px[0] + 300, px[1] + 300]]); }
+    else if (state.from === '__geo' && moved) { state.customStart = px; render(); }
+  }, err => { $('locate').classList.remove('on'); watchId = null; toast(err.code === 1 ? T('geoDenied') : T('geoNone')); },
+  { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+function useGeo() { state.from = '__geo'; state.customStart = state.geo.px; fillFrom(); render(); }
+if (GEO) { $('locate').hidden = false; $('useloc').hidden = false; }
+$('locate').onclick = locate; $('useloc').onclick = locate;
+if (state.locked) $('modeseg').hidden = true;
 
 /* ================= старт ================= */
 setLang(LANG);

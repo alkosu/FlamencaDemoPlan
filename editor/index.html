@@ -45,7 +45,7 @@ main{flex:1;display:grid;grid-template-columns:52px minmax(0,1fr) 330px;min-heig
 .tools hr{border:0;border-top:1px solid var(--line);margin:4px 2px;width:auto}
 .mapwrap{position:relative;min-width:0;min-height:0;background:#f7f6f1}
 #map{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
-#map.t-draw,#map.t-lift,#map.t-water,#map.t-start,#map.t-route{cursor:crosshair}
+#map.t-draw,#map.t-lift,#map.t-water,#map.t-start,#map.t-route,#map.t-elec,#map.t-info,#map.t-garage,#map.t-geo{cursor:crosshair}
 #map.t-delete{cursor:not-allowed}
 .hud{position:absolute;left:10px;top:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;max-width:calc(100% - 80px);box-shadow:0 3px 10px rgb(0 0 0/.1)}
 .hud b{color:var(--accent)}
@@ -55,8 +55,8 @@ main{flex:1;display:grid;grid-template-columns:52px minmax(0,1fr) 330px;min-heig
 .vis label{display:flex;gap:5px;align-items:center;cursor:pointer}
 aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 @media (max-width:900px){aside{border-left:0;border-top:1px solid var(--line)}}
-.tabs{display:flex;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:9px 4px;cursor:pointer;font-weight:500;color:var(--muted)}
+.tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs button{flex:1 1 30%;background:none;border:0;border-bottom:2px solid transparent;padding:9px 4px;cursor:pointer;font-weight:500;color:var(--muted)}
 .tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
 .pane{padding:12px 14px;overflow:auto;display:flex;flex-direction:column;gap:10px;flex:1}
 .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -126,11 +126,15 @@ code{font-family:var(--mono);font-size:12px;background:var(--chip);padding:1px 4
     <div class="tabs" role="tablist">
       <button type="button" data-tab="props" class="on">Свойства</button>
       <button type="button" data-tab="objs">Объекты</button>
+      <button type="button" data-tab="page">Инфо-страница</button>
+      <button type="button" data-tab="geo">Привязка</button>
       <button type="button" data-tab="check">Проверка</button>
       <button type="button" data-tab="pub">Публикация</button>
     </div>
     <div class="pane" id="p-props"></div>
     <div class="pane" id="p-objs" hidden></div>
+    <div class="pane" id="p-page" hidden></div>
+    <div class="pane" id="p-geo" hidden></div>
     <div class="pane" id="p-check" hidden>
       <button class="btn primary" id="runCheck" type="button">Проверить сеть</button>
       <div class="res" id="checkRes"><div class="note">Проверка ищет оторванные куски, висячие концы и лестницы, до которых нельзя дойти от точек старта.</div></div>
@@ -154,6 +158,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--chip);padding:1px 4
 </main>
 <div class="toast" id="toast" hidden></div>
 <script src="../data/plan-data.js"></script>
+<script src="../assets/geo.js"></script>
 <script src="editor.js"></script>
 </body>
 </html>

@@ -32,8 +32,10 @@
 
   <div class="grid">
     <aside>
+      <div class="seg full simple-only" id="stabs" role="tablist" hidden><button type="button" data-v="route" class="on">Ruta</button><button type="button" data-v="info">Información</button></div>
+      <article id="infopage" class="infopage simple-only info-only"></article>
       <!-- Simple: номер квартиры крупно -->
-      <form id="sform" class="simple-only" novalidate>
+      <form id="sform" class="simple-only route-only" novalidate>
         <label class="lbl" for="num" data-i="aptNumber">Número de apartamento</label>
         <input id="num" class="bignum" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="search" placeholder="449" maxlength="8">
         <div class="err" id="err" role="alert" hidden></div>
@@ -46,15 +48,16 @@
         <div class="sugg" id="sugg" role="listbox" hidden></div>
       </div>
 
-      <div>
+      <div class="route-only">
         <label class="lbl" for="from" data-i="from">Desde</label>
         <div class="row">
           <select id="from"></select>
           <button class="btn pro-only" id="pick" type="button" data-i="onMap">En el plano</button>
+          <button class="btn simple-only" id="useloc" type="button" hidden>◎</button>
         </div>
       </div>
 
-      <button class="btn primary simple-only" id="go" type="submit" form="sform" data-i="search">Buscar</button>
+      <button class="btn primary simple-only route-only" id="go" type="submit" form="sform" data-i="search">Buscar</button>
 
       <div class="pro-only">
         <span class="lbl" data-i="floorOnPlan">Planta en el plano</span>
@@ -65,7 +68,7 @@
         <div class="seg full" id="showseg"></div>
       </div>
 
-      <div class="card" id="info" aria-live="polite"></div>
+      <div class="card route-only" id="info" aria-live="polite"></div>
     </aside>
 
     <div class="mapbox" id="mapbox">
@@ -86,10 +89,11 @@
           <g id="g-route"></g>
           <g data-layer="lifts"></g>
           <g data-layer="liftsdata"></g>
-          <g data-layer="water"></g>
+          <g data-layer="panels"></g>
           <g data-layer="esc"></g>
           <g data-layer="badges"></g>
-          <g id="g-starts"></g>
+          <g data-layer="places"></g>
+          <g id="g-me"></g>
         </g>
       </svg>
       <div class="layers pro-only" id="layers">
@@ -100,6 +104,7 @@
         <button id="zin" type="button">+</button>
         <button id="zout" type="button">−</button>
         <button id="zfit" type="button">⤢</button>
+        <button id="locate" type="button" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
       </div>
       <div class="hint" id="hint" hidden data-i="pickHint"></div>
     </div>
@@ -108,8 +113,11 @@
 
   <p class="note foot" id="footnote"></p>
 </div>
+<div class="pop" id="pop" hidden><div class="popc" role="dialog" aria-modal="true" aria-labelledby="poptitle"><button class="popx" id="popx" type="button" aria-label="×">×</button><div id="popb"></div></div></div>
+<div class="ntoast" id="ntoast" role="status" hidden></div>
 
 <script src="data/plan-data.js"></script>
+<script src="assets/geo.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>

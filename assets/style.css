@@ -124,3 +124,26 @@ header.top h1{font-size:18px;line-height:1.25;flex:1 1 220px;min-width:0}
 
 .previewbar{background:#b5541f;color:#fff;padding:7px 12px;font-size:13px;border-radius:8px;max-width:1400px;margin:0 auto 10px}
 .previewbar a{color:#fff;font-weight:600}
+
+/* ===== вкладки Simple, окно объекта, «Где я» ===== */
+.info-only{display:none}
+body.tab-info.mode-simple .route-only{display:none!important}
+body.tab-info.mode-simple .info-only{display:block}
+body.tab-info.mode-simple .mapbox{display:none}
+.infopage{line-height:1.55}
+.infopage h2{font-size:20px;margin:0 0 8px}.infopage h3{font-size:16px;margin:14px 0 6px}.infopage h4{font-size:14px;margin:12px 0 4px}
+.infopage p{margin:0 0 10px}.infopage ul{margin:0 0 10px;padding-left:20px}
+.infopage a,.ptext a{color:var(--accent);overflow-wrap:anywhere}
+svg .mk{transform:scale(var(--ms,1))}
+.pop{position:fixed;inset:0;background:rgb(0 0 0/.35);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:max(16px,env(safe-area-inset-left,0px));padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+@media (min-width:700px){.pop{align-items:center}}
+.popc{position:relative;background:var(--panel);color:var(--fg);border-radius:14px;padding:18px 18px 16px;width:min(440px,100%);max-height:80vh;overflow:auto;box-shadow:0 12px 40px rgb(0 0 0/.25);display:flex;flex-direction:column;gap:8px}
+.popc h3{margin:0;font-size:19px;padding-right:36px;text-wrap:balance}
+.popx{position:absolute;right:10px;top:10px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--chip);font-size:22px;line-height:1;cursor:pointer}
+.pkind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted)}
+.pk-info{color:#6d4bd1}.pk-elec{color:#b07c00}.pk-water{color:#2e95c2}
+.ptext{line-height:1.5;overflow-wrap:anywhere}
+.pmeta{margin:0;font-size:13px;color:var(--muted)}
+.plink{align-self:flex-start;text-decoration:none;margin-top:4px}
+.ntoast{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:9px;font-size:13px;z-index:60;max-width:calc(100% - 32px)}
+#locate.on{background:var(--accent);color:#fff;border-color:var(--accent)}
