@@ -184,8 +184,15 @@ function dijkstra(src, dst) { // бинарная куча
     if (a < h.length && h[a][0] < h[m][0]) m = a; if (b < h.length && h[b][0] < h[m][0]) m = b; if (m === i) break; [h[m], h[i]] = [h[i], h[m]]; i = m; } } return t; };
   while (h.length) { const [d, u] = pop(); if (u === dst) break; if (d > dist[u]) continue;
     for (const [v, w] of ADJ[u]) if (d + w < dist[v]) { dist[v] = d + w; prev[v] = u; push([dist[v], v]); } }
-  const path = []; for (let u = dst; u !== -1; u = prev[u]) path.unshift(u);
-  return { len: dist[dst], path };
+  let end = dst, gap = 0;
+  if (dist[dst] === Infinity) { // финиш в другом куске сети: идём до ближайшей достижимой точки, остаток — по прямой
+    let bd = Infinity; const [tx, ty] = NODES[dst];
+    for (let i = 0; i < NODES.length; i++) if (dist[i] < Infinity) { const d = Math.hypot(NODES[i][0] - tx, NODES[i][1] - ty); if (d < bd) { bd = d; end = i; } }
+    gap = bd;
+  }
+  const path = []; for (let u = end; u !== -1; u = prev[u]) path.unshift(u);
+  if (end !== dst) path.push(dst);
+  return { len: dist[end] + gap, path, gapFrom: end !== dst ? path.length - 2 : -1 };
 }
 const nearestNode = (x, y) => { let b = 0, bd = Infinity; NODES.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; b = i; } }); return b; };
 
@@ -314,6 +321,8 @@ function render() {
   const a = state.apt, s = STACKS[a.stack], st = stairOf(a), sp = startPoint();
   const r = dijkstra(sp.node, st.node);
   let pts = [[sp.x, sp.y], ...r.path.map(i => NODES[i]), [st.x, st.y]];
+  if (r.gapFrom >= 0) { const tail = pts.slice(r.gapFrom + 1); pts = pts.slice(0, r.gapFrom + 2);
+    el('polyline', { points: tail.map(q => q.join(',')).join(' '), fill: 'none', stroke: '#1f4fd1', 'stroke-width': 4, 'stroke-dasharray': '8 8', 'stroke-linecap': 'round' }, gR); }
   const len = r.len + Math.hypot(sp.x - NODES[sp.node][0], sp.y - NODES[sp.node][1]) + Math.hypot(st.x - NODES[st.node][0], st.y - NODES[st.node][1]);
   const ps = pts.map(q => q.join(',')).join(' ');
   el('polyline', { points: ps, fill: 'none', stroke: '#fff', 'stroke-width': 13, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, gR);
