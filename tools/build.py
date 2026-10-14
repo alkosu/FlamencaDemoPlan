@@ -155,6 +155,11 @@ def dijkstra(src):
     return dist
 
 
+def tr(v, lang="ru"):
+    """Строка из complex.json: либо просто текст, либо {"ru":…, "en":…, …}."""
+    return v.get(lang) or next(iter(v.values())) if isinstance(v, dict) else v
+
+
 def apartments(stacks):
     esc = CFG["escaleras"]
     dist = dijkstra(CFG["starts"][0]["node"])
@@ -172,7 +177,7 @@ def apartments(stacks):
                 "stack": re.sub(r"\d", "", s["units"][0]).split("-")[0],
                 "stair": f"Escalera {e['n']}" + (" (на плане не подписана)" if e.get("unlabeled") else ""),
                 "lift": "не нужен" if floor == 0 else f"у Escalera {e['n']} (предположительно)",
-                "access": CFG["access"][s["building"]].replace("{n}", str(e["n"]))
+                "access": tr(CFG["access"][s["building"]]).replace("{n}", str(e["n"]))
                           + (" (уровень входа)" if floor == 0 else f" → {floor} этаж"),
                 "meters": round(dist[e["node"]] * CFG["image"]["metersPerPx"]),
             })

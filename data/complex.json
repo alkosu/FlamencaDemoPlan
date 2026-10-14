@@ -1,6 +1,11 @@
 {
  "_comment": "Ручная разметка комплекса. Координаты — пиксели исходной картинки source/plan.jpg. После правок: python tools/build.py",
- "title": "Навигатор ЖК · корпуса 14–17",
+ "title": {
+  "ru": "Навигатор ЖК · корпуса 14–17",
+  "en": "Residence navigator · blocks 14–17",
+  "es": "Navegador del residencial · bloques 14–17",
+  "fr": "Navigateur de la résidence · bâtiments 14–17"
+ },
  "image": {
   "file": "source/plan.jpg",
   "width": 1540,
@@ -69,11 +74,36 @@
   }
  },
  "access": {
-  "16": "Северная дорожка → Escalera {n} → открытая галерея",
-  "17": "Северная дорожка → Escalera {n} → открытая галерея",
-  "15": "Западная дорожка → Escalera {n} → галерея вдоль фасада",
-  "14.1": "Центральный проход между 14.1 и 14.2 → Escalera {n} → холл",
-  "14.2": "Центральный проход между 14.1 и 14.2 → Escalera {n} → холл"
+  "16": {
+   "ru": "Северная дорожка → Escalera {n} → открытая галерея",
+   "en": "North path → Escalera {n} → open gallery",
+   "es": "Camino norte → Escalera {n} → galería abierta",
+   "fr": "Allée nord → Escalera {n} → coursive ouverte"
+  },
+  "17": {
+   "ru": "Северная дорожка → Escalera {n} → открытая галерея",
+   "en": "North path → Escalera {n} → open gallery",
+   "es": "Camino norte → Escalera {n} → galería abierta",
+   "fr": "Allée nord → Escalera {n} → coursive ouverte"
+  },
+  "15": {
+   "ru": "Западная дорожка → Escalera {n} → галерея вдоль фасада",
+   "en": "West path → Escalera {n} → gallery along the façade",
+   "es": "Camino oeste → Escalera {n} → galería de fachada",
+   "fr": "Allée ouest → Escalera {n} → coursive en façade"
+  },
+  "14.1": {
+   "ru": "Центральный проход между 14.1 и 14.2 → Escalera {n} → холл",
+   "en": "Central passage between 14.1 and 14.2 → Escalera {n} → lobby",
+   "es": "Pasaje central entre 14.1 y 14.2 → Escalera {n} → vestíbulo",
+   "fr": "Passage central entre 14.1 et 14.2 → Escalera {n} → hall"
+  },
+  "14.2": {
+   "ru": "Центральный проход между 14.1 и 14.2 → Escalera {n} → холл",
+   "en": "Central passage between 14.1 and 14.2 → Escalera {n} → lobby",
+   "es": "Pasaje central entre 14.1 y 14.2 → Escalera {n} → vestíbulo",
+   "fr": "Passage central entre 14.1 et 14.2 → Escalera {n} → hall"
+  }
  },
  "stacks": [
   {
@@ -916,45 +946,140 @@
    ]
   ],
   "stepNames": {
-   "x1": "перейдите дорогу по зебре",
-   "w2": "идите по западной дорожке вдоль корпуса 15",
-   "nw": "выйдите на главную аллею",
-   "m3": "пройдите мимо входа к бассейну",
-   "m5": "перекрёсток у площадки 82",
-   "pz2": "поднимитесь к северной дорожке",
-   "n0": "идите на восток вдоль корпуса 17",
-   "n2": "идите на запад вдоль корпуса 16",
-   "cN": "войдите в центральный проход корпуса 14 с севера",
-   "cS": "войдите в центральный проход корпуса 14 с юга",
-   "s1": "идите по южной аллее вдоль парковки",
-   "s5": "обогните корпус 14 с юга",
-   "wS": "спуститесь к южной аллее"
+   "x1": {
+    "ru": "перейдите дорогу по зебре",
+    "en": "cross the road at the zebra crossing",
+    "es": "cruce la calle por el paso de cebra",
+    "fr": "traversez la rue au passage piéton"
+   },
+   "w2": {
+    "ru": "идите по западной дорожке вдоль корпуса 15",
+    "en": "walk along the west path by block 15",
+    "es": "siga el camino oeste junto al bloque 15",
+    "fr": "longez l'allée ouest du bâtiment 15"
+   },
+   "nw": {
+    "ru": "выйдите на главную аллею",
+    "en": "go out onto the main alley",
+    "es": "salga al paseo principal",
+    "fr": "rejoignez l'allée principale"
+   },
+   "m3": {
+    "ru": "пройдите мимо входа к бассейну",
+    "en": "pass the pool entrance",
+    "es": "pase junto a la entrada de la piscina",
+    "fr": "passez devant l'entrée de la piscine"
+   },
+   "m5": {
+    "ru": "перекрёсток у площадки 82",
+    "en": "junction by square 82",
+    "es": "cruce junto a la plaza 82",
+    "fr": "carrefour près de la place 82"
+   },
+   "pz2": {
+    "ru": "поднимитесь к северной дорожке",
+    "en": "go up to the north path",
+    "es": "suba al camino norte",
+    "fr": "montez vers l'allée nord"
+   },
+   "n0": {
+    "ru": "идите на восток вдоль корпуса 17",
+    "en": "head east along block 17",
+    "es": "vaya hacia el este junto al bloque 17",
+    "fr": "dirigez-vous vers l'est le long du bâtiment 17"
+   },
+   "n2": {
+    "ru": "идите на запад вдоль корпуса 16",
+    "en": "head west along block 16",
+    "es": "vaya hacia el oeste junto al bloque 16",
+    "fr": "dirigez-vous vers l'ouest le long du bâtiment 16"
+   },
+   "cN": {
+    "ru": "войдите в центральный проход корпуса 14 с севера",
+    "en": "enter the central passage of block 14 from the north",
+    "es": "entre en el pasaje central del bloque 14 por el norte",
+    "fr": "entrez dans le passage central du bâtiment 14 par le nord"
+   },
+   "cS": {
+    "ru": "войдите в центральный проход корпуса 14 с юга",
+    "en": "enter the central passage of block 14 from the south",
+    "es": "entre en el pasaje central del bloque 14 por el sur",
+    "fr": "entrez dans le passage central du bâtiment 14 par le sud"
+   },
+   "s1": {
+    "ru": "идите по южной аллее вдоль парковки",
+    "en": "walk along the south alley by the parking",
+    "es": "siga el paseo sur junto al aparcamiento",
+    "fr": "longez l'allée sud le long du parking"
+   },
+   "s5": {
+    "ru": "обогните корпус 14 с юга",
+    "en": "go around block 14 on the south side",
+    "es": "rodee el bloque 14 por el sur",
+    "fr": "contournez le bâtiment 14 par le sud"
+   },
+   "wS": {
+    "ru": "спуститесь к южной аллее",
+    "en": "go down to the south alley",
+    "es": "baje al paseo sur",
+    "fr": "descendez vers l'allée sud"
+   }
   }
  },
  "starts": [
   {
    "node": "gate",
-   "name": "Вход с Calle Jalón"
+   "name": {
+    "ru": "Вход с Calle Jalón",
+    "en": "Calle Jalón entrance",
+    "es": "Entrada por Calle Jalón",
+    "fr": "Entrée Calle Jalón"
+   }
   },
   {
    "node": "parkW",
-   "name": "Парковка 116–121"
+   "name": {
+    "ru": "Парковка 116–121",
+    "en": "Parking 116–121",
+    "es": "Aparcamiento 116–121",
+    "fr": "Parking 116–121"
+   }
   },
   {
    "node": "parkN",
-   "name": "Парковка 122–130"
+   "name": {
+    "ru": "Парковка 122–130",
+    "en": "Parking 122–130",
+    "es": "Aparcamiento 122–130",
+    "fr": "Parking 122–130"
+   }
   },
   {
    "node": "parkS",
-   "name": "Парковка 103–115"
+   "name": {
+    "ru": "Парковка 103–115",
+    "en": "Parking 103–115",
+    "es": "Aparcamiento 103–115",
+    "fr": "Parking 103–115"
+   }
   },
   {
    "node": "pool",
-   "name": "Бассейн (51)"
+   "name": {
+    "ru": "Бассейн (51)",
+    "en": "Pool (51)",
+    "es": "Piscina (51)",
+    "fr": "Piscine (51)"
+   }
   },
   {
    "node": "pz1",
-   "name": "Площадка 82"
+   "name": {
+    "ru": "Площадка 82",
+    "en": "Square 82",
+    "es": "Plaza 82",
+    "fr": "Place 82"
+   }
   }
  ],
  "parking": [
@@ -1128,7 +1253,12 @@
  ],
  "labels": [
   [
-   "Бассейн",
+   {
+    "ru": "Бассейн",
+    "en": "Pool",
+    "es": "Piscina",
+    "fr": "Piscine"
+   },
    575,
    602,
    16
@@ -1241,5 +1371,11 @@
    1102,
    866
   ]
+ ],
+ "languages": [
+  "es",
+  "en",
+  "fr",
+  "ru"
  ]
 }

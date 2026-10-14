@@ -100,3 +100,40 @@ tbody tr.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .routeline{stroke-dasharray:14 10;animation:dash 1.2s linear infinite}
 @keyframes dash{to{stroke-dashoffset:-24}}
+
+/* ===== Режимы, шапка, Simple (mobile-first) ===== */
+.mode-simple .pro-only,.mode-pro .simple-only{display:none!important}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+header.top h1{font-size:18px;line-height:1.25;flex:1 1 220px;min-width:0}
+.ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ctrls select{width:auto;padding:7px 8px}
+.ctrls .seg button{padding:7px 14px;font-weight:600}
+#sform{display:flex;flex-direction:column;gap:6px}
+.bignum{font-family:var(--mono);font-size:40px;font-weight:600;text-align:center;letter-spacing:.06em;padding:10px 12px!important;border-width:2px!important;border-radius:10px!important;font-variant-numeric:tabular-nums}
+.bignum::placeholder{color:var(--line)}
+.bignum:focus{border-color:var(--accent)!important;outline:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-size:17px;font-weight:600;padding:12px 16px;border-radius:10px;width:100%}
+.btn.primary:hover{filter:brightness(1.08)}
+.err{color:var(--mark);font-size:13px}
+.ans{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ansnum{font-size:44px;font-weight:600;line-height:1;color:var(--accent)}
+.anssub{color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile b{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1.1}
+.tile b i{font-style:normal;font-size:16px;color:var(--muted)}
+.tile small{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.tile.t-esc.e1{border-color:#3a8c5b;box-shadow:inset 3px 0 0 #3a8c5b}
+.tile.t-esc.e2{border-color:#b57d1a;box-shadow:inset 3px 0 0 #b57d1a}
+.tile.t-lift{box-shadow:inset 3px 0 0 var(--accent);border-color:var(--accent)}
+.foot{margin:0}
+.mode-simple .mapbox{height:min(68vh,720px)}
+@media (max-width:860px){
+  body{padding-block:10px 24px}
+  .wrap{gap:12px}
+  aside{padding:14px;gap:12px}
+  .mode-simple .mapbox{height:62vh;min-height:340px}
+  .mapctl button{width:40px;height:40px}
+}
+@media (max-width:380px){ .bignum{font-size:34px} .tile b{font-size:26px} .ctrls .seg button{padding:7px 10px} }
