@@ -283,7 +283,7 @@ const MODES = ['simple', 'pro'];
 const state = {
   locked: MODES.includes(params.get('mode')) && params.has('lock'), geo: null,
   mode: MODES.includes(params.get('mode')) ? params.get('mode') : 'simple',
-  apt: null, from: Z.starts[0].id, customStart: null, picking: false, floor: 'all', show: 'all', hover: -1
+  apt: null, from: (Z.starts.find(st => st.default) || Z.starts.find(st => /main|principal/i.test(st.id + ' ' + Object.values(st.name || {}).join(' '))) || Z.starts[0]).id, customStart: null, picking: false, floor: 'all', show: 'all', hover: -1
 };
 const simple = () => state.mode === 'simple';
 
@@ -358,8 +358,6 @@ function render() {
   const rs = drawRoute(gR, sp, st.x, st.y, st.node, up && sameSpot ? C_LIFT : C_STAIR);
   const rl = up && !sameSpot ? drawRoute(gR, sp, lx, ly, lnode, C_LIFT) : rs;
   el('circle', { cx: sp.x, cy: sp.y, r: 11, fill: '#1d2420', stroke: '#fff', 'stroke-width': 3 }, gR);
-  el('line', { x1: st.x, y1: st.y, x2: s.c[0], y2: s.c[1], stroke: '#d1491f', 'stroke-width': 3.5, 'stroke-dasharray': '5 5' }, gR);
-  if (!sameSpot && up) el('line', { x1: lx, y1: ly, x2: s.c[0], y2: s.c[1], stroke: '#d1491f', 'stroke-width': 3.5, 'stroke-dasharray': '5 5' }, gR);
   if (up && sameSpot) { floorBadge(gR, st.x, st.y, a.floor, 'stair', C_STAIR, -30); floorBadge(gR, st.x, st.y, a.floor, 'lift', C_LIFT, 30); }
   else { floorBadge(gR, st.x, st.y, a.floor, 'stair', C_STAIR); if (up) floorBadge(gR, lx, ly, a.floor, 'lift', C_LIFT); }
   const boxes = (simple() ? s.near : [a.stack]).map(i => STACKS[i].box);
