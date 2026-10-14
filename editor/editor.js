@@ -218,7 +218,7 @@ function markerPos(key) { const [t, k] = key.split(/:(.*)/s); if (t === 'stair')
 function moveMarker(key, p) { const [t, k] = key.split(/:(.*)/s); if (t === 'stair') { D.stairs[k] = [p[0], p[1]]; return; } const o = { water: D.water, lift: D.lifts, start: D.starts }[t][+k]; o.x = p[0]; o.y = p[1]; }
 svg.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = toSvg(e.clientX, e.clientY); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, px, py); }, { passive: false });
 svg.addEventListener('pointerdown', e => {
-  svg.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  try { svg.setPointerCapture(e.pointerId); } catch (_) { /* синтетические события */ } ptrs.set(e.pointerId, [e.clientX, e.clientY]);
   if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); down = null; drag = null; return; }
   const p = toSvg(e.clientX, e.clientY); down = { x: e.clientX, y: e.clientY, vb: [...vb], moved: 0, p };
   if (tool === 'move') {
@@ -308,7 +308,7 @@ function removeMarker(key) { const [t, k] = key.split(/:(.*)/s); ({ water: D.wat
 function select(key) { sel = { key }; showTab('props'); renderMarks(); renderProps(); }
 
 document.addEventListener('keydown', e => {
-  if (e.target.closest('input,textarea,select')) return;
+  if (e.target.closest && e.target.closest('input,textarea,select')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
   if (e.key === 'Enter' || e.key === 'Escape') { if (drawing) { finishDraw(); changed(); } else if (e.key === 'Escape') { sel = null; route = null; renderAll(); } return; }
   const t = TOOLS.find(t => t && t[2].toLowerCase() === e.key.toLowerCase()); if (t) setTool(t[0]);

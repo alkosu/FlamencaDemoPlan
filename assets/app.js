@@ -475,7 +475,7 @@ function stackAt(x, y) {
 }
 svg.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = toSvg(e.clientX, e.clientY); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, px, py); }, { passive: false });
 const ptrs = new Map(); let drag = null, moved = 0, pinch = null;
-svg.addEventListener('pointerdown', e => { svg.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); moved = 0;
+svg.addEventListener('pointerdown', e => { try { svg.setPointerCapture(e.pointerId); } catch (_) { /* */ } ptrs.set(e.pointerId, [e.clientX, e.clientY]); moved = 0;
   if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, vb: [...vb] };
   if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) }; drag = null; } });
 svg.addEventListener('pointermove', e => {
