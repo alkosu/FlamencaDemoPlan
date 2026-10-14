@@ -55,7 +55,10 @@
         </div>
       </div>
 
-      <button class="btn primary simple-only route-only" id="go" type="submit" form="sform" data-i="search">Buscar</button>
+      <div class="gorow route-only">
+        <button class="btn primary simple-only" id="go" type="submit" form="sform" data-i="search">Buscar</button>
+        <button class="btn" id="reset" type="button" data-i="reset">Restablecer</button>
+      </div>
 
       <div class="pro-only">
         <span class="lbl" data-i="floorOnPlan">Planta en el plano</span>
@@ -104,8 +107,6 @@
     </div>
   </div>
 
-
-  <p class="note foot" id="footnote"></p>
 </div>
 <div class="pop" id="pop" hidden><div class="popc" role="dialog" aria-modal="true" aria-labelledby="poptitle"><button class="popx" id="popx" type="button" aria-label="×">×</button><div id="popb"></div></div></div>
 <div class="ntoast" id="ntoast" role="status" hidden></div>

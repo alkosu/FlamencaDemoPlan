@@ -132,19 +132,19 @@ const I18N = {
   }
 };
 const I18N_X = {
-  es: { tabRoute: 'Ruta', tabInfo: 'Información', infoEmpty: 'Aún no hay información.', openLink: 'Abrir enlace', close: 'Cerrar', apts: 'Apartamentos',
+  es: { reset: 'Restablecer', pickApt: 'Pulse el número para trazar la ruta', tabRoute: 'Ruta', tabInfo: 'Información', infoEmpty: 'Aún no hay información.', openLink: 'Abrir enlace', close: 'Cerrar', apts: 'Apartamentos',
     locate: 'Dónde estoy', locating: 'Buscando su ubicación…', geoDenied: 'Sin acceso a la ubicación. Permítalo en los ajustes del navegador.', geoFar: 'Parece que está fuera del residencial.', geoNone: 'La ubicación no está disponible.', myLocation: 'Mi ubicación', accuracy: a => `precisión ±${a} m`,
     type: { entrance: 'Entrada', place: 'Punto de salida', info: 'Información', elec: 'Cuadro eléctrico', water: 'Cuadro de agua', garage: 'Entrada al garaje', facility: 'Servicio' },
     lyx: { places: 'Entradas, información, garajes', panels: 'Cuadros eléctricos y de agua' } },
-  en: { tabRoute: 'Route', tabInfo: 'Information', infoEmpty: 'No information yet.', openLink: 'Open link', close: 'Close', apts: 'Apartments',
+  en: { reset: 'Reset', pickApt: 'Tap a number to build the route', tabRoute: 'Route', tabInfo: 'Information', infoEmpty: 'No information yet.', openLink: 'Open link', close: 'Close', apts: 'Apartments',
     locate: 'Where am I', locating: 'Finding your location…', geoDenied: 'No access to location. Allow it in the browser settings.', geoFar: 'You seem to be outside the residence.', geoNone: 'Location is not available.', myLocation: 'My location', accuracy: a => `accuracy ±${a} m`,
     type: { entrance: 'Entrance', place: 'Starting point', info: 'Information', elec: 'Electrical panel', water: 'Water panel', garage: 'Garage entrance', facility: 'Facility' },
     lyx: { places: 'Entrances, information, garages', panels: 'Electrical and water panels' } },
-  fr: { tabRoute: 'Itinéraire', tabInfo: 'Informations', infoEmpty: 'Pas encore d’informations.', openLink: 'Ouvrir le lien', close: 'Fermer', apts: 'Appartements',
+  fr: { reset: 'Réinitialiser', pickApt: 'Touchez un numéro pour tracer l’itinéraire', tabRoute: 'Itinéraire', tabInfo: 'Informations', infoEmpty: 'Pas encore d’informations.', openLink: 'Ouvrir le lien', close: 'Fermer', apts: 'Appartements',
     locate: 'Où suis-je', locating: 'Recherche de votre position…', geoDenied: 'Pas d’accès à la position. Autorisez-la dans les réglages du navigateur.', geoFar: 'Vous semblez être hors de la résidence.', geoNone: 'Position indisponible.', myLocation: 'Ma position', accuracy: a => `précision ±${a} m`,
     type: { entrance: 'Entrée', place: 'Point de départ', info: 'Informations', elec: 'Tableau électrique', water: 'Tableau d’eau', garage: 'Entrée du garage', facility: 'Équipement' },
     lyx: { places: 'Entrées, informations, garages', panels: 'Tableaux électriques et d’eau' } },
-  ru: { tabRoute: 'Маршрут', tabInfo: 'Информация', infoEmpty: 'Информации пока нет.', openLink: 'Открыть ссылку', close: 'Закрыть', apts: 'Квартиры',
+  ru: { reset: 'Сбросить', pickApt: 'Нажмите номер, чтобы построить маршрут', tabRoute: 'Маршрут', tabInfo: 'Информация', infoEmpty: 'Информации пока нет.', openLink: 'Открыть ссылку', close: 'Закрыть', apts: 'Квартиры',
     locate: 'Где я', locating: 'Определяем местоположение…', geoDenied: 'Нет доступа к местоположению. Разрешите его в настройках браузера.', geoFar: 'Похоже, вы не на территории комплекса.', geoNone: 'Местоположение недоступно.', myLocation: 'Моё местоположение', accuracy: a => `точность ±${a} м`,
     type: { entrance: 'Вход', place: 'Точка старта', info: 'Информация', elec: 'Электрический щит', water: 'Щит воды', garage: 'Въезд в гараж', facility: 'Объект' },
     lyx: { places: 'Входы, информация, гаражи', panels: 'Электрические и водяные щиты' } }
@@ -394,8 +394,14 @@ function selectApt(a, fit = true) {
   try { history.replaceState(null, '', location.pathname + location.search + '#' + (a.kind === 'apt' ? a.num : label(a).replace(/[^\w.]/g, ''))); } catch (_) { /* file:// */ }
 }
 function openStack(i) {
-  const f = state.apt ? state.apt.floor : (state.floor === 'all' ? 3 : +state.floor);
-  selectApt(unitAt(i, f) || unitAt(i, 0), false);
+  const s = STACKS[i], st = STAIR[s.stair], us = UNITS.filter(u => u.stack === i).sort((a, b) => b.floor - a.floor || String(a.num).localeCompare(String(b.num)));
+  if (!us.length) return;
+  const lf = liftOf(us[0]);
+  const sub = [T('bld')(s.block), st ? `${T('staircase')} ${st.n}` : '', lf ? T('lift') : ''].filter(Boolean).join(' · ');
+  const rows = [...new Set(us.map(u => u.floor))].map(f => `<div class="srow"><span>${esc(T('floorN')(f))}</span><div>${us.filter(u => u.floor === f).map(u => `<button class="btn anum" type="button" data-u="${UNITS.indexOf(u)}">${esc(label(u))}</button>`).join('')}</div></div>`).join('');
+  $('popb').innerHTML = `<div class="pkind">${esc(T('apts'))}</div><h3 id="poptitle">${esc(sub)}</h3><div class="srows">${rows}</div><p class="pmeta">${esc(T('pickApt'))}</p>`;
+  $('popb').querySelectorAll('[data-u]').forEach(b => b.onclick = () => { closePop(); selectApt(UNITS[+b.dataset.u]); });
+  showPop();
 }
 
 /* ================= Simple: форма ================= */
@@ -450,7 +456,6 @@ function setLang(l) {
   document.querySelectorAll('[data-i]').forEach(n => { n.textContent = T(n.dataset.i); });
   $('q').placeholder = '449 · A3a-449';
   ['zin', 'zout', 'zfit'].forEach(k => $(k).setAttribute('aria-label', T(k)));
-  $('footnote').textContent = T('foot');
   poiTitles.forEach(([e, c]) => { e.textContent = `${c} — ${tr(Z.legend[c] || '')}`; });
   badgeTitles.forEach(([e, t]) => { e.textContent = T('bld')(t); });
   renderInfoPage();
@@ -598,11 +603,13 @@ function openPop(it) {
   const text = o.info ? `<div class="ptext">${linkify(o.info).replace(/\n/g, '<br>')}</div>` : '';
   const link = safeUrl(o.link);
   $('popb').innerHTML = `<div class="pkind pk-${it.kind}">${esc(sub)}</div><h3 id="poptitle">${esc(title)}</h3>${text}${extra}${link ? `<a class="btn primary plink" href="${esc(link)}" target="_blank" rel="noopener">${esc(T('openLink'))} ↗</a>` : ''}`;
-  $('pop').hidden = false; $('popx').focus();
+  showPop();
 }
+let popAt = 0;
+function showPop() { popAt = Date.now(); $('pop').hidden = false; try { $('popx').focus({ preventScroll: true }); } catch (_) { /* */ } }
 const closePop = () => { $('pop').hidden = true; $('pop').classList.remove('big'); };
 $('popx').onclick = closePop;
-$('pop').addEventListener('click', e => { if (e.target === $('pop')) closePop(); });
+$('pop').addEventListener('click', e => { if (e.target === $('pop') && Date.now() - popAt > 450) closePop(); }); // на телефоне «клик» от того же касания прилетает в подложку — не закрывать сразу
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('pop').hidden) closePop(); });
 
 /* ================= страница общей информации ================= */
@@ -630,9 +637,11 @@ function renderInfoPage() { const x = infoPage(); $('infobtn').hidden = !x; $('i
 function openInfo() {
   const x = infoPage(); if (!x) return; const link = safeUrl(x.link);
   $('popb').innerHTML = `<div class="pkind">${esc(T('tabInfo'))}</div>${x.title ? `<h3 id="poptitle">${esc(x.title)}</h3>` : ''}<div class="infopage">${md(x.text)}</div>${link ? `<a class="btn primary plink" href="${esc(link)}" target="_blank" rel="noopener">${esc(T('openLink'))} ↗</a>` : ''}`;
-  $('pop').classList.add('big'); $('pop').hidden = false; $('popx').focus();
+  $('pop').classList.add('big'); showPop();
 }
 $('infobtn').onclick = openInfo;
+$('reset').onclick = () => { state.apt = null; $('num').value = ''; $('q').value = ''; $('err').hidden = true; closePop(); render(); vb = [...FULL]; setVB();
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (_) { /* file:// */ } };
 
 /* ================= «Где я» ================= */
 let watchId = null, firstFix = true;

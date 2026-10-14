@@ -159,3 +159,12 @@ svg .mk{transform:scale(var(--ms,1))}
 .hit{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.2}
 .hit b{font-size:20px;font-weight:600}
 .hit span{font-size:15px;color:var(--muted)}
+
+.gorow{display:flex;gap:8px}
+.gorow .btn.primary{flex:1;width:auto}
+.gorow #reset{flex:0 0 auto;font-size:15px;padding:12px 14px;border-radius:10px}
+.srows{display:flex;flex-direction:column;gap:6px}
+.srow{display:flex;align-items:center;gap:10px}
+.srow>span{min-width:92px;font-size:13px;color:var(--muted,#888)}
+.srow>div{display:flex;flex-wrap:wrap;gap:6px}
+.btn.anum{min-width:52px;padding:8px 10px;font-weight:600;font-size:16px}
